@@ -20,35 +20,37 @@ Bachillo is a mobile-first web application that helps drivers navigate streets m
 - 🖼️ Automatic image optimization and compression
 
 ## 🏗️ Project Structure
+```
 bachillo/ 
 ├── street-bump-frontend/
-│ ├── src/ 
-│ │ ├── app/
-│ │ │ ├── layout.tsx 
-│ │ │ └── page.tsx 
-│ │ ├── components/
-│ │ │ ├── BumpMap.jsx 
-│ │ │ └── ReportForm.jsx 
-│ │ └── services/
-│ │ └── bumpService.ts 
-│ ├── public/
-│ │ └── cerro-campana.jpg 
-│ └── package.json 
-│ ├── street-bump-admin/
-│ ├── src/ 
-│ │ ├── app/
-│ │ │ ├── layout.tsx 
-│ │ │ └── page.tsx 
-│ │ ├── components/
-│ │ │ └── UnverifiedBumpsList.jsx 
-│ │ └── services/
-│ │ └── adminService.ts 
-│ └── package.json 
-│ └── street-bump-backend/
-├── server.js
-├── serviceAccountKey.json 
-├── .env 
-└── package.json
+│   ├── src/ 
+│   │   ├── app/
+│   │   │   ├── layout.tsx 
+│   │   │   └── page.tsx 
+│   │   ├── components/
+│   │   │   ├── BumpMap.jsx 
+│   │   │   └── ReportForm.jsx 
+│   │   └── services/
+│   │       └── bumpService.ts 
+│   ├── public/
+│   │   └── cerro-campana.jpg 
+│   └── package.json 
+├── street-bump-admin/
+│   ├── src/ 
+│   │   ├── app/
+│   │   │   ├── layout.tsx 
+│   │   │   └── page.tsx 
+│   │   ├── components/
+│   │   │   └── UnverifiedBumpsList.jsx 
+│   │   └── services/
+│   │       └── adminService.ts 
+│   └── package.json 
+└── street-bump-backend/
+    ├── server.js
+    ├── serviceAccountKey.json 
+    ├── .env 
+    └── package.json
+```
 
 ## 🛠️ Technology Stack
 
