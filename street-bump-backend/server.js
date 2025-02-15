@@ -5,6 +5,22 @@ const cors = require("cors");
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsDoc = require('swagger-jsdoc');
 const multer = require('multer');
+const functions = require('firebase-functions');
+
+const config = {
+  apiKey: process.env.API_KEY,
+  authDomain: process.env.AUTH_DOMAIN,
+  projectId: process.env.PROJECT_ID,
+  storageBucket: process.env.STORAGE_BUCKET,
+  messagingSenderId: process.env.MESSAGING_SENDER_ID,
+  appId: process.env.APP_ID,
+  measurementId: process.env.MEASUREMENT_ID
+};
+
+admin.initializeApp({
+  credential: admin.credential.applicationDefault(),
+  storageBucket: process.env.STORAGE_BUCKET
+});
 
 const app = express();
 
@@ -132,33 +148,35 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 const serviceAccount = require("./serviceAccountKey.json");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET
-});
-
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Add after existing middleware
 const verifyAdminToken = async (req, res, next) => {
-  if (!req.headers.authorization?.startsWith('Bearer ')) {
+  const idToken = req.headers.authorization?.split('Bearer ')[1];
+  
+  if (!idToken) {
     return res.status(401).json({ error: 'No token provided' });
   }
-  
+
   try {
-    const token = req.headers.authorization.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.email !== process.env.ADMIN_EMAIL) {
-      throw new Error('Unauthorized email');
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const adminEmail = process.env.ADMIN_EMAIL;
+    
+    if (decodedToken.email !== adminEmail) {
+      return res.status(403).json({ error: 'Unauthorized' });
     }
+    
     req.user = decodedToken;
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'Invalid token' });
   }
 };
+
+// Apply middleware to admin routes
+app.use('/api/admin/*', verifyAdminToken);
 
 app.get('/api/bumps/nearby', async (req, res) => {
   const { lat, lng, radius } = req.query;
@@ -232,7 +250,7 @@ app.get('/api/bumps', async (req, res) => {
 });
 
 // New endpoint for admin to get unverified bumps
-app.get('/api/admin/bumps/unverified', verifyAdminToken, async (req, res) => {
+app.get('/api/admin/bumps/unverified', async (req, res) => {
   try {
     const bumpsSnapshot = await db.collection('bumps')
       .where('verified', '==', false)
@@ -250,7 +268,7 @@ app.get('/api/admin/bumps/unverified', verifyAdminToken, async (req, res) => {
 });
 
 // New endpoint to verify a bump
-app.patch('/api/admin/bumps/:id/verify', verifyAdminToken, async (req, res) => {
+app.patch('/api/admin/bumps/:id/verify', async (req, res) => {
   try {
     await db.collection('bumps').doc(req.params.id).update({
       verified: true,
@@ -263,7 +281,7 @@ app.patch('/api/admin/bumps/:id/verify', verifyAdminToken, async (req, res) => {
   }
 });
 
-app.delete('/api/admin/bumps/:id', verifyAdminToken, async (req, res) => {
+app.delete('/api/admin/bumps/:id', async (req, res) => {
   try {
     const doc = await db.collection('bumps').doc(req.params.id).get();
     if (!doc.exists) {
@@ -283,7 +301,4 @@ app.delete('/api/admin/bumps/:id', verifyAdminToken, async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+exports.api = functions.https.onRequest(app);

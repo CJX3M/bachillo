@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "bachillo"
-  }
+  },
+  "targets": {
+    "bachillo": {
+      "hosting": {
+        "frontend": [
+          "bachillo"
+        ],
+        "admin": [
+          "bachillo-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

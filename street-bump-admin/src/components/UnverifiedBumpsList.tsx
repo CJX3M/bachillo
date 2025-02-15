@@ -24,7 +24,7 @@ export default function UnverifiedBumpsList({ token }: { token: string }) {
       try {
         const data = await adminService.getUnverifiedBumps(token);
         setBumps(data);
-      } catch (err) {
+      } catch {
         setError('Failed to fetch unverified bumps');
       } finally {
         setLoading(false);
@@ -37,7 +37,7 @@ export default function UnverifiedBumpsList({ token }: { token: string }) {
     try {
       await adminService.verifyBump(id, token);
       setBumps(bumps.filter(bump => bump.id !== id));
-    } catch (err) {
+    } catch {
       setError('Failed to verify bump');
     }
   };
@@ -46,7 +46,7 @@ export default function UnverifiedBumpsList({ token }: { token: string }) {
     try {
       await adminService.deleteBump(id, token);
       setBumps(bumps.filter(bump => bump.id !== id));
-    } catch (err) {
+    } catch {
       setError('Failed to delete bump');
     }
   };
