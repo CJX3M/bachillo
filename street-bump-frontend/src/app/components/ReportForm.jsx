@@ -51,6 +51,7 @@ export default function ReportForm() {
   const [location, setLocation] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
 
   const getDeviceInstructions = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -90,9 +91,30 @@ export default function ReportForm() {
     return degrees + minutes/60 + seconds/3600;
   };
 
+  const getCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => reject(error),
+        { enableHighAccuracy: true }
+      );
+    });
+  };
+
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     setError(null);
+    setShowLocationPrompt(false);
 
     let processedFile = file;
     if (file.size > MAX_FILE_SIZE) {
@@ -106,7 +128,7 @@ export default function ReportForm() {
       const lng = EXIF.getTag(this, "GPSLongitude");
 
       if (!lat || !lng) {
-        setError("This image doesn't contain location data. Please enable location services for your camera:");
+        setShowLocationPrompt(true);
         setLocation(null);
         return;
       }
@@ -168,6 +190,38 @@ export default function ReportForm() {
         </label>
       </div>
 
+      {showLocationPrompt && (
+        <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+          <p className="text-yellow-800 mb-3">This image doesn't contain location data. Would you like to use your current location?</p>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  const currentLocation = await getCurrentLocation();
+                  setLocation(currentLocation);
+                  setShowLocationPrompt(false);
+                  setError(null);
+                } catch (err) {
+                  setError("Unable to get current location. Please enable location services:");
+                }
+              }}
+              className="flex-1 py-2 px-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+            >
+              Use Current Location
+            </button>
+            <button
+              onClick={() => {
+                setShowLocationPrompt(false);
+                setError("A location is required to submit a bump report");
+              }}
+              className="flex-1 py-2 px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mt-4 p-4 bg-red-50 rounded-lg">
           <p className="text-red-700 mb-2">{error}</p>
@@ -175,16 +229,25 @@ export default function ReportForm() {
         </div>
       )}
 
+      {location && (
+        <div className="p-4 bg-green-50 rounded-lg">
+          <p className="text-green-700">Location captured successfully</p>
+          <p className="text-sm text-green-600">
+            Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}
+          </p>
+        </div>
+      )}
+
       <button
         onClick={handleSubmit}
-        disabled={!location || !imageFile}
+        disabled={!location || !imageFile || loading}
         className={`mt-4 w-full py-2 px-4 rounded-lg ${
-          !location || !imageFile 
+          !location || !imageFile || loading
             ? 'bg-gray-300 cursor-not-allowed'
             : 'bg-violet-600 text-white hover:bg-violet-700'
         }`}
       >
-        Submit Report
+        {loading ? 'Submitting...' : 'Submit Report'}
       </button>
     </div>
   );

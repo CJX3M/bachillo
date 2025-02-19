@@ -4,7 +4,14 @@
     "indexes": "firestore.indexes.json"
   },
   "functions": {
-    "source": "street-bump-backend"
+    "source": "street-bump-backend",
+    "runtime": "nodejs18",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log"
+    ]
   },
   "hosting": [
     {

@@ -1,28 +1,25 @@
-require('dotenv').config();
-const express = require("express");
-const admin = require("firebase-admin");
-const cors = require("cors");
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsDoc = require('swagger-jsdoc');
-const multer = require('multer');
 const functions = require('firebase-functions');
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const admin = require('firebase-admin');
 
-const config = {
-  apiKey: process.env.API_KEY,
-  authDomain: process.env.AUTH_DOMAIN,
-  projectId: process.env.PROJECT_ID,
-  storageBucket: process.env.STORAGE_BUCKET,
-  messagingSenderId: process.env.MESSAGING_SENDER_ID,
-  appId: process.env.APP_ID,
-  measurementId: process.env.MEASUREMENT_ID
-};
-
-admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
-  storageBucket: process.env.STORAGE_BUCKET
-});
+// Remove swagger imports and configuration
+admin.initializeApp();
 
 const app = express();
+const db = admin.firestore();
+const bucket = admin.storage().bucket();
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.use(cors({ origin: true }));
+
+// Remove swagger setup and routes
+// app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+
+// Remove dotenv require and config
+// const dotenv = require('dotenv');
+// dotenv.config();
 
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -38,119 +35,7 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Swagger configuration
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Street Bump API',
-      version: '1.0.0',
-      description: 'API for reporting and viewing street bumps'
-    },
-    servers: [
-      {
-        url: 'http://localhost:3001'
-      }
-    ]
-  },
-  apis: ['./server.js']
-};
-
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
-// Swagger documentation for endpoints
-/**
- * @swagger
- * /api/bumps:
- *   get:
- *     summary: Get all verified bumps
- *     responses:
- *       200:
- *         description: List of verified bumps
- *   post:
- *     summary: Create a new bump report
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               image:
- *                 type: string
- *                 format: binary
- *               lat:
- *                 type: number
- *               lng:
- *                 type: number
- * 
- * /api/bumps/nearby:
- *   get:
- *     summary: Get bumps within radius
- *     parameters:
- *       - in: query
- *         name: lat
- *         required: true
- *         schema:
- *           type: number
- *       - in: query
- *         name: lng
- *         required: true
- *         schema:
- *           type: number
- *       - in: query
- *         name: radius
- *         required: true
- *         schema:
- *           type: number
- *
- * /api/admin/bumps/unverified:
- *   get:
- *     summary: Get unverified bumps
- *     security:
- *       - BearerAuth: []
- *
- * /api/admin/bumps/{id}/verify:
- *   patch:
- *     summary: Verify a bump
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *
- * /api/admin/bumps/{id}:
- *   delete:
- *     summary: Delete a bump
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- */
-
-/**
- * @swagger
- * components:
- *   securitySchemes:
- *     BearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- */
-
 const serviceAccount = require("./serviceAccountKey.json");
-
-const db = admin.firestore();
-const bucket = admin.storage().bucket();
-const upload = multer({ storage: multer.memoryStorage() });
 
 // Add after existing middleware
 const verifyAdminToken = async (req, res, next) => {
