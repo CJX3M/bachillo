@@ -1,7 +1,10 @@
 // components/ReportForm.js
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import EXIF from "exif-js";
 import { bumpService } from '@/services/bumpService';
+import { googleMapsService } from '@/services/googleMapsService';
+import { CameraIcon, PhotoIcon, PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Dialog } from '@headlessui/react';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_WIDTH = 1920; // Maximum width for compressed image
@@ -46,42 +49,40 @@ const compressImage = (file) => {
   });
 };
 
+const LocationDisplay = ({ location }) => {
+  const [address, setAddress] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAddress = async () => {
+      if (location?.lat && location?.lng) {
+        setLoading(true);
+        const addr = await googleMapsService.getAddressFromCoordinates(location.lat, location.lng);
+        setAddress(addr);
+        setLoading(false);
+      }
+    };
+    fetchAddress();
+  }, [location]);
+
+  if (loading) {
+    return <p className="text-gray-600">Obteniendo dirección...</p>;
+  }
+
+  return (
+    <p className="text-gray-900">
+      {address || `Lat: ${location?.lat.toFixed(6)}, Lng: ${location?.lng.toFixed(6)}`}
+    </p>
+  );
+};
+
 export default function ReportForm() {
   const [error, setError] = useState(null);
   const [location, setLocation] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
-
-  const getDeviceInstructions = () => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    return (
-      <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-        <h3 className="font-semibold text-lg mb-2 text-yellow-900">
-          {isIOS ? "Enable Location on iPhone" : "Enable Location on Android"}
-        </h3>
-        
-        {isIOS ? (
-          <ol className="space-y-2 text-sm text-yellow-800">
-            <li>1. Open <strong>Settings</strong></li>
-            <li>2. Scroll to <strong>Privacy & Security</strong></li>
-            <li>3. Tap <strong>Location Services</strong></li>
-            <li>4. Turn on <strong>Location Services</strong></li>
-            <li>5. Find your <strong>Camera app</strong></li>
-            <li>6. Select <strong>"While Using"</strong></li>
-          </ol>
-        ) : (
-          <ol className="space-y-2 text-sm text-yellow-800">
-            <li>1. Open your <strong>Camera app</strong></li>
-            <li>2. Tap the <strong>Settings icon</strong> (⚙️)</li>
-            <li>3. Find <strong>Location tags</strong></li>
-            <li>4. Toggle <strong>Save location</strong> ON</li>
-          </ol>
-        )}
-      </div>
-    );
-  };
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const parseEXIFCoordinate = (coordinate) => {
     if (!coordinate) return null;
@@ -138,6 +139,7 @@ export default function ReportForm() {
         lng: parseEXIFCoordinate(lng),
       };
       setLocation(coords);
+      setShowPreviewModal(true);
     });
   };
 
@@ -172,8 +174,9 @@ export default function ReportForm() {
             onChange={handleImageUpload}
             className="hidden"
           />
-          <div className="w-full py-3 px-4 text-center bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors">
-            Take Photo
+          <div className="w-full py-3 px-4 text-center bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
+            <CameraIcon className="w-5 h-5" />
+            Tomar Foto
           </div>
         </label>
 
@@ -184,15 +187,16 @@ export default function ReportForm() {
             onChange={handleImageUpload}
             className="hidden"
           />
-          <div className="w-full py-3 px-4 text-center bg-green-500 text-white rounded-lg cursor-pointer hover:bg-green-600 transition-colors">
-            Choose from Gallery
+          <div className="w-full py-3 px-4 text-center bg-green-500 text-white rounded-lg cursor-pointer hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
+            <PhotoIcon className="w-5 h-5" />
+            Elegir de Galería
           </div>
         </label>
       </div>
 
       {showLocationPrompt && (
         <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-          <p className="text-yellow-800 mb-3">This image doesn't contain location data. Would you like to use your current location?</p>
+          <p className="text-yellow-800 mb-3">Esta imagen no contiene datos de ubicación. ¿Deseas usar tu ubicación actual?</p>
           <div className="flex gap-2">
             <button
               onClick={async () => {
@@ -201,22 +205,23 @@ export default function ReportForm() {
                   setLocation(currentLocation);
                   setShowLocationPrompt(false);
                   setError(null);
+                  setShowPreviewModal(true); // Show preview modal after getting location
                 } catch (err) {
-                  setError("Unable to get current location. Please enable location services:");
+                  setError("No se pudo obtener la ubicación actual. Intenta de nuevo o usa una foto con datos de ubicación.");
                 }
               }}
               className="flex-1 py-2 px-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
             >
-              Use Current Location
+              Usar Ubicación Actual
             </button>
             <button
               onClick={() => {
                 setShowLocationPrompt(false);
-                setError("A location is required to submit a bump report");
+                setError("No se puede enviar el reporte sin datos de ubicación. Por favor usa una foto con datos de ubicación o permite el uso de tu ubicación actual.");
               }}
               className="flex-1 py-2 px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
             >
-              Cancel
+              Cancelar
             </button>
           </div>
         </div>
@@ -224,31 +229,62 @@ export default function ReportForm() {
 
       {error && (
         <div className="mt-4 p-4 bg-red-50 rounded-lg">
-          <p className="text-red-700 mb-2">{error}</p>
-          {getDeviceInstructions()}
+          <p className="text-red-700">{error}</p>
         </div>
       )}
 
-      {location && (
-        <div className="p-4 bg-green-50 rounded-lg">
-          <p className="text-green-700">Location captured successfully</p>
-          <p className="text-sm text-green-600">
-            Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}
-          </p>
-        </div>
-      )}
-
-      <button
-        onClick={handleSubmit}
-        disabled={!location || !imageFile || loading}
-        className={`mt-4 w-full py-2 px-4 rounded-lg ${
-          !location || !imageFile || loading
-            ? 'bg-gray-300 cursor-not-allowed'
-            : 'bg-violet-600 text-white hover:bg-violet-700'
-        }`}
+      <Dialog 
+        open={Boolean(showPreviewModal && imageFile && location)}
+        onClose={() => setShowPreviewModal(false)}
+        className="relative z-50"
       >
-        {loading ? 'Submitting...' : 'Submit Report'}
-      </button>
+        {/* Modal backdrop */}
+        <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
+
+        {/* Full-screen container */}
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto min-w-[320px] w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <div className="relative">
+              <div className="flex justify-between items-start mb-4">
+                <Dialog.Title className="text-xl font-semibold text-gray-900">
+                  Confirmar Reporte de Bache
+                </Dialog.Title>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="ml-4 rounded-full bg-gray-100 p-1.5 hover:bg-gray-200 transition-colors"
+                >
+                  <XMarkIcon className="h-4 w-4 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Image preview */}
+              <div className="mb-4 rounded-lg overflow-hidden bg-gray-100">
+                <img
+                  src={imageFile ? URL.createObjectURL(imageFile) : ''}
+                  alt="Vista previa"
+                  className="w-full h-52 object-cover"
+                />
+              </div>
+
+              {/* Location info */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <p className="text-gray-700 font-medium mb-1">Ubicación:</p>
+                <LocationDisplay location={location} />
+              </div>
+
+              {/* Submit button */}
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="w-full py-3 px-4 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              >
+                <PaperAirplaneIcon className="w-5 h-5" />
+                {loading ? 'Enviando...' : 'Confirmar y Enviar'}
+              </button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
     </div>
   );
-};
+}

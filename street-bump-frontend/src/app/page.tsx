@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { bumpService } from '@/services/bumpService';
 import ReportForm from './components/ReportForm';
 import BumpMap from './components/BumpMap';
 
@@ -15,9 +16,8 @@ export default function Home() {
   useEffect(() => {
     const fetchBumps = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bumps`);
-        const data = await response.json();
-        console.log('API Response:', data); // Debug response
+        const data = await bumpService.getAllBumps();
+        console.log('API Response:', data);
         
         if (!Array.isArray(data)) {
           setBackgroundImages([]); 
@@ -49,23 +49,24 @@ export default function Home() {
       <header className="relative h-64 flex items-center justify-center overflow-hidden">
         <motion.div 
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.4 }}
+          animate={{ opacity: 0.63 }}
           transition={{ duration: 1 }}
           className="absolute inset-0 z-0"
           style={{
-            backgroundImage: "url('/cerro-campana.jpg')",
+            backgroundImage: "url('/cerro-campana.webp')",
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            backgroundPosition: 'center right',
+            filter: 'brightness(0.9)'
           }}
         />
-        <motion.h1 
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="text-7xl font-bold z-10 text-yellow-900 drop-shadow-lg"
-        >
-          Bachillo
-        </motion.h1>
+        <div className="relative z-10 text-center">
+          <h1 className="text-4xl font-bold text-white drop-shadow-lg">
+            Bachillo
+          </h1>
+          <p className="text-xl text-white drop-shadow-md mt-2">
+            Cuida tu carro, reporta los baches
+          </p>
+        </div>
       </header>
 
       <nav className="bg-white/90 shadow-lg p-6 flex justify-center gap-6 sticky top-0 z-20 backdrop-blur-sm">
@@ -78,7 +79,7 @@ export default function Home() {
           }`}
         >
           <ExclamationTriangleIcon className="w-5 h-5" />
-          Report Bump
+          Reportar Bache
         </button>
         <button 
           onClick={() => setShowMap(true)}
@@ -89,7 +90,7 @@ export default function Home() {
           }`}
         >
           <MapIcon className="w-5 h-5" />
-          View Map
+          Ver Mapa
         </button>
       </nav>
 

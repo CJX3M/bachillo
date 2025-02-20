@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { GoogleMap, LoadScript, Marker, InfoWindow } from "@react-google-maps/api";
 import { bumpService } from '@/services/bumpService';
+import { googleMapsService } from '@/services/googleMapsService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ListBulletIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
@@ -66,12 +67,9 @@ export default function BumpMap() {
 
   // Get address from coordinates
   const getAddressFromCoords = async (lat, lng) => {
-    const geocoder = new window.google.maps.Geocoder();
     try {
-      const response = await geocoder.geocode({
-        location: { lat, lng }
-      });
-      return response.results[0]?.formatted_address || "Unknown location";
+      const address = await googleMapsService.getAddressFromCoordinates(lat, lng);
+      return address || "Unknown location";
     } catch (error) {
       return "Unknown location";
     }

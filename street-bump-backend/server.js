@@ -63,6 +63,15 @@ const verifyAdminToken = async (req, res, next) => {
 // Apply middleware to admin routes
 app.use('/api/admin/*', verifyAdminToken);
 
+// Add health check endpoint before other routes
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 app.get('/api/bumps/nearby', async (req, res) => {
   const { lat, lng, radius } = req.query;
   const center = new admin.firestore.GeoPoint(parseFloat(lat), parseFloat(lng));
