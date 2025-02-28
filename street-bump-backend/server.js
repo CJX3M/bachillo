@@ -1,16 +1,20 @@
 const functions = require('firebase-functions');
 const express = require('express');
 const cors = require('cors');
-const multer = require('multer');
 const admin = require('firebase-admin');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
-// Remove swagger imports and configuration
-admin.initializeApp();
+// Initialize Firebase Admin
+admin.initializeApp({
+  credential: admin.credential.cert(require("./serviceAccountKey.json")),
+  storageBucket: 'bachillo.appspot.com'
+});
+
+// Get Firestore instance
+const db = getFirestore();
 
 const app = express();
-const db = admin.firestore();
 const bucket = admin.storage().bucket();
-const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors({ origin: true }));
 
@@ -95,33 +99,62 @@ app.get('/api/bumps/nearby', async (req, res) => {
 });
 
 // POST endpoint - Add verified: false when creating new bump
-app.post('/api/bumps', upload.single('image'), async (req, res) => {
+app.post('/api/bumps', async (req, res) => {
   try {
-    const { lat, lng } = req.body;
-    const file = req.file;
-    
-    const fileName = `bumps/${lat}_${lng}_${Date.now()}.jpg`;
-    const fileBuffer = Buffer.from(file.buffer);
-    
-    const blob = bucket.file(fileName);
-    await blob.save(fileBuffer, {
-      contentType: 'image/jpeg'
+    const { image, lat, lng } = req.body;
+
+    if (!image || !lat || !lng) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Parse coordinates as numbers
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({ error: 'Invalid coordinates' });
+    }
+
+    // Remove the data:image/jpeg;base64, prefix if present
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Create a unique filename
+    const filename = `bump_${Date.now()}.jpg`;
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(filename);
+
+    await file.save(imageBuffer, {
+      metadata: {
+        contentType: 'image/jpeg',
+      }
     });
 
-    const [url] = await blob.getSignedUrl({
-      action: 'read',
-      expires: '03-01-2500'
+    // Get the public URL
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+
+    // Create the document data first
+    const bumpData = {
+      imageUrl: publicUrl,
+      location: {
+        latitude: latitude,
+        longitude: longitude
+      },
+      verified: false,
+      createdAt: FieldValue.serverTimestamp()
+    };
+
+    // Save to Firestore
+    const bumpRef = await db.collection('bumps').add(bumpData);
+
+    res.json({ 
+      id: bumpRef.id,
+      imageUrl: publicUrl,
+      location: { lat: latitude, lng: longitude }
     });
 
-    const docRef = await db.collection('bumps').add({
-      location: new admin.firestore.GeoPoint(parseFloat(lat), parseFloat(lng)),
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      imageUrl: url,
-      verified: false // Add verification field
-    });
-
-    res.status(201).json({ id: docRef.id, imageUrl: url });
   } catch (error) {
+    console.error('Error creating bump:', error);
     res.status(500).json({ error: 'Failed to create bump report' });
   }
 });
@@ -195,4 +228,7 @@ app.delete('/api/admin/bumps/:id', async (req, res) => {
   }
 });
 
-exports.api = functions.https.onRequest(app);
+exports.api = functions.runWith({
+  timeoutSeconds: 300,
+  memory: '1GB'
+}).https.onRequest(app);
