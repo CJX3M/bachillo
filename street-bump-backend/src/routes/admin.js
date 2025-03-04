@@ -1,12 +1,18 @@
 const express = require('express');
 const router = express.Router();
+const { 
+    getUnverifiedBumps,
+    verifyBump,
+    deleteBump 
+} = require('../controllers/bumpController');
 const { verifyAdminToken } = require('../middleware/auth');
-const bumpController = require('../controllers/bumpController');
 
+// Apply admin authentication middleware to all routes
 router.use(verifyAdminToken);
 
-router.get('/bumps/unverified', bumpController.getUnverifiedBumps);
-router.patch('/bumps/:id/verify', bumpController.verifyBump);
-router.delete('/bumps/:id', bumpController.deleteBump);
+// Admin routes for bumps
+router.get('/bumps/unverified', getUnverifiedBumps);
+router.patch('/bumps/:id/verify', verifyBump);
+router.delete('/bumps/:id', deleteBump);
 
 module.exports = router;

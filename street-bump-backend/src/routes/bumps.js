@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const bumpController = require('../controllers/bumpController');
+const { 
+    getVerifiedBumps, 
+    createBump
+} = require('../controllers/bumpController');
 
-router.get('/', bumpController.getVerifiedBumps);
-router.post('/', bumpController.createBump);
-router.get('/nearby', bumpController.getNearbyBumps);
+// Public routes
+router.get('/', getVerifiedBumps);
+router.post('/', createBump);
 
 module.exports = router;

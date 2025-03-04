@@ -82,6 +82,53 @@ const bumpController = {
             console.error('Error fetching nearby bumps:', error);
             res.status(500).json({ error: 'Failed to fetch nearby bumps' });
         }
+    },
+
+    // Get all unverified bumps
+    getUnverifiedBumps: async (req, res) => {
+        try {
+            const bumpsSnapshot = await db.collection('bumps')
+                .where('verified', '==', false)
+                .orderBy('createdAt', 'desc')
+                .get();
+            
+            const bumps = [];
+            bumpsSnapshot.forEach(doc => {
+                bumps.push({ id: doc.id, ...doc.data() });
+            });
+            
+            res.json(bumps);
+        } catch (error) {
+            console.error('Error fetching unverified bumps:', error);
+            res.status(500).json({ error: 'Failed to fetch unverified bumps' });
+        }
+    },
+
+    // Verify a bump
+    verifyBump: async (req, res) => {
+        try {
+            const { id } = req.params;
+            await db.collection('bumps').doc(id).update({
+                verified: true,
+                verifiedAt: new Date().toISOString()
+            });
+            res.json({ message: 'Bump verified successfully' });
+        } catch (error) {
+            console.error('Error verifying bump:', error);
+            res.status(500).json({ error: 'Failed to verify bump' });
+        }
+    },
+
+    // Delete a bump
+    deleteBump: async (req, res) => {
+        try {
+            const { id } = req.params;
+            await db.collection('bumps').doc(id).delete();
+            res.json({ message: 'Bump deleted successfully' });
+        } catch (error) {
+            console.error('Error deleting bump:', error);
+            res.status(500).json({ error: 'Failed to delete bump' });
+        }
     }
 };
 
