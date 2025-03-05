@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const { onRequest } = require('firebase-functions/v2/https');
 const express = require('express');
 const corsMiddleware = require('./src/config/cors');
 const bumpRoutes = require('./src/routes/bumps');
@@ -11,19 +11,18 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {  // Remove /api prefix
   res.json({
     status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    timestamp: new Date().toISOString()
   });
 });
 
-// Routes
-app.use('/api/bumps', bumpRoutes);
-app.use('/api/admin', adminRoutes);
+// Routes - Remove /api prefix as Firebase Functions adds it automatically
+app.use('/bumps', bumpRoutes);
+app.use('/admin', adminRoutes);
 
-exports.api = functions.runWith({
-  timeoutSeconds: 300,
-  memory: '1GB'
-}).https.onRequest(app);
+exports.api = onRequest({
+  memory: '1GiB',
+  timeoutSeconds: 300
+}, app);

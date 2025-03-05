@@ -1,12 +1,12 @@
 const admin = require('firebase-admin');
-const { getFirestore } = require('firebase-admin/firestore');
 
-admin.initializeApp({
-  credential: admin.credential.cert(require("../../serviceAccountKey.json")),
-  storageBucket: 'bachillo.appspot.com'
-});
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
+}
 
-const db = getFirestore();
-const bucket = admin.storage().bucket();
+const db = admin.firestore();
+console.log('Firebase Admin initialized'); // Debug log
 
-module.exports = { admin, db, bucket };
+module.exports = { admin, db };

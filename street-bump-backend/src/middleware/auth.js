@@ -1,24 +1,26 @@
-const { admin } = require('../config/firebase');
+const { auth } = require('firebase-admin');
 
 const verifyAdminToken = async (req, res, next) => {
-  const idToken = req.headers.authorization?.split('Bearer ')[1];
-  
-  if (!idToken) {
-    return res.status(401).json({ error: 'No token provided' });
-  }
-
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const adminEmail = process.env.ADMIN_EMAIL;
-    
-    if (decodedToken.email !== adminEmail) {
-      return res.status(403).json({ error: 'Unauthorized' });
+    const authHeader = req.headers.authorization;
+    console.log('Auth Header:', authHeader); // Debug log
+
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.log('No bearer token found');
+      return res.status(401).json({ error: 'No token provided' });
     }
-    
+
+    const token = authHeader.split('Bearer ')[1];
+    console.log('Verifying token...'); // Debug log
+
+    const decodedToken = await auth().verifyIdToken(token);
+    console.log('Decoded token:', decodedToken); // Debug log
+
     req.user = decodedToken;
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    console.error('Auth error:', error);
+    res.status(403).json({ error: 'Unauthorized access' });
   }
 };
 
