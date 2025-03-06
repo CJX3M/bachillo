@@ -1,3 +1,5 @@
+import { bumpService, Bump } from './bumpService';
+
 // Types for Google Maps API responses
 interface AddressComponent {
   long_name: string;
@@ -25,11 +27,13 @@ interface Coordinates {
   lng: number;
 }
 
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GMAPS_API_KEY;
+
 export const googleMapsService = {
   getAddressFromCoordinates: async (lat: number, lng: number): Promise<string | null> => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=es`
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`
       );
       const data: GeocodeResponse = await response.json();
       
@@ -55,7 +59,7 @@ export const googleMapsService = {
       }
       return null;
     } catch (error) {
-      console.error('Error getting address:', error);
+      console.error('Geocoding error:', error);
       return null;
     }
   },
@@ -102,6 +106,29 @@ export const googleMapsService = {
     
     const [degrees, minutes, seconds] = coordinate;
     return degrees + minutes/60 + seconds/3600;
+  },
+
+  async fetchBumpsInRadius(center: { lat: number; lng: number }, radius: number = 5) {
+    try {
+      // Use bumpService for the API call
+      const bumps = await bumpService.getNearbyBumps(center, radius);
+      
+      // Add addresses to bumps using Google Maps geocoding
+      const bumpsWithAddresses = await Promise.all(
+        bumps.map(async (bump: Bump) => ({
+          ...bump,
+          address: await this.getAddressFromCoordinates(
+            bump.location.lat,
+            bump.location.lng
+          )
+        }))
+      );
+
+      return bumpsWithAddresses;
+    } catch (error) {
+      console.error('Failed to fetch nearby bumps:', error);
+      throw error;
+    }
   }
 };
 

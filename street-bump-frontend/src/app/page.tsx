@@ -5,9 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { bumpService } from '@/services/bumpService';
 import ReportForm from './components/ReportForm';
-import BumpMap from './components/BumpMap';
+import dynamic from 'next/dynamic';
 
-export default function Home() {
+const BumpMap = dynamic(() => import('@/app/components/BumpMap'), {
+  ssr: false,
+  loading: () => <div>Cargando mapa...</div>
+});
+
+export default function HomePage() {
   const [showMap, setShowMap] = useState(false);
   const [backgroundImages, setBackgroundImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);

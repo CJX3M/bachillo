@@ -86,33 +86,38 @@ export default function UnverifiedBumpsList() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {bumps.map((bump) => (
-            <div key={bump.id} className="bg-white rounded-lg shadow p-4">
-              <Image 
-                src={bump.imageUrl} 
-                alt="Bache" 
-                width={400}
-                height={300}
-                className="w-full h-48 object-cover rounded-lg mb-4"
-              />
+            <div key={bump.id} className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition-shadow">
+              <div className="relative">
+                <Image 
+                  src={bump.imageUrl} 
+                  alt="Bache" 
+                  width={400}
+                  height={300}
+                  className="w-full h-48 object-cover rounded-lg mb-4"
+                />
+                <span className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs">
+                  No verificado
+                </span>
+              </div>
               <div className="space-y-2">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 line-clamp-2">
                   {bump.address || `${bump.location.lat}, ${bump.location.lng}`}
                 </p>
                 <p className="text-sm text-gray-500">
                   Reportado el: {formatDate(bump.createdAt)}
                 </p>
-                <div className="flex gap-2">
-                  <button
+                <div className="flex gap-2 mt-4">
+                  <button 
                     onClick={() => handleVerify(bump.id)}
-                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                    className="flex-1 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
                   >
-                    Verify
+                    Aprobar
                   </button>
-                  <button
+                  <button 
                     onClick={() => handleDeny(bump.id)}
-                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                    className="flex-1 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
                   >
-                    Deny
+                    Rechazar
                   </button>
                 </div>
               </div>

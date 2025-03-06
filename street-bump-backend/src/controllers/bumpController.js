@@ -54,14 +54,14 @@ const bumpController = {
                 return res.status(400).json({ error: 'Missing coordinates' });
             }
 
-            const bumpsSnapshot = await db.collection('bumps')
-                .where('verified', '==', true)
-                .get();
-            
             const centerLat = parseFloat(lat);
             const centerLng = parseFloat(lng);
             const radiusKm = parseFloat(radius);
 
+            const bumpsSnapshot = await db.collection('bumps')
+                .where('verified', '==', true)
+                .get();
+            
             const bumps = [];
             bumpsSnapshot.forEach(doc => {
                 const bump = { id: doc.id, ...doc.data() };
