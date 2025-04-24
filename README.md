@@ -95,7 +95,7 @@ cd ../street-bump-backend && npm install
 ```bash
 Frontend (.env.local):
 NEXT_PUBLIC_API_URL=http://localhost:3001
-NEXT_PUBLIC_GMAPS_API_KEY=your_maps_key
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_maps_key
 Backend (.env):
 PORT=3001
 FIREBASE_STORAGE_BUCKET=your-bucket.appspot.com

@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import LocationDisplay from './LocationDisplay';
 import MapPicker from './MapPicker';
 import InstructionsModal from './InstructionsModal';
+import GoogleMapsWrapper from './GoogleMapsWrapper';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -22,11 +23,13 @@ export default function ReportForm() {
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     setError(null);
     setShowLocationPrompt(false);
+    setShowMapPicker(false);
 
     let processedFile = file;
     if (file.size > MAX_FILE_SIZE) {
@@ -165,6 +168,7 @@ export default function ReportForm() {
             <button
               onClick={() => {
                 setShowLocationPrompt(false);
+                setShowMapPicker(true);
                 setShowPreviewModal(true);
               }}
               className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2"
@@ -227,13 +231,15 @@ export default function ReportForm() {
               </div>
 
               <div className="mb-4">
-                {!location && (
+                {showMapPicker && (
                   <div className="mb-4">
                     <p className="text-gray-700 font-medium mb-2">Selecciona la ubicación del bache:</p>
-                    <MapPicker
-                      onLocationSelect={(newLocation) => setLocation(newLocation)}
-                      initialLocation={location}
-                    />
+                    <GoogleMapsWrapper>
+                      <MapPicker
+                        onLocationSelect={(newLocation) => setLocation(newLocation)}
+                        initialLocation={location}
+                      />
+                    </GoogleMapsWrapper>
                   </div>
                 )}
                 

@@ -1,23 +1,39 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { googleMapsService } from '@/services/googleMapsService';
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 export default function LocationDisplay({ location }) {
   const [address, setAddress] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const debouncedFetchAddress = useCallback(
+    debounce(async (lat, lng) => {
+      const addr = await googleMapsService.getAddressFromCoordinates(lat, lng);
+      setAddress(addr);
+      setLoading(false);
+    }, 1000),
+    []
+  );
+
   useEffect(() => {
-    const fetchAddress = async () => {
-      if (location?.lat && location?.lng) {
-        setLoading(true);
-        const addr = await googleMapsService.getAddressFromCoordinates(location.lat, location.lng);
-        setAddress(addr);
-        setLoading(false);
-      }
-    };
-    fetchAddress();
-  }, [location]);
+    if (location?.lat && location?.lng) {
+      setLoading(true);
+      debouncedFetchAddress(location.lat, location.lng);
+    }
+  }, [location, debouncedFetchAddress]);
 
   if (loading) {
     return <p className="text-gray-600">Obteniendo dirección...</p>;

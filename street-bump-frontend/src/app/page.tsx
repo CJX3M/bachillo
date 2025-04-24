@@ -6,6 +6,7 @@ import { MapIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { bumpService } from '@/services/bumpService';
 import ReportForm from './components/ReportForm';
 import dynamic from 'next/dynamic';
+import GoogleMapsWrapper from './components/GoogleMapsWrapper';
 
 const BumpMap = dynamic(() => import('@/app/components/BumpMap'), {
   ssr: false,
@@ -134,7 +135,13 @@ export default function HomePage() {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          {showMap ? <BumpMap /> : <ReportForm />}
+          {showMap ? (
+            <GoogleMapsWrapper>
+              <BumpMap />
+            </GoogleMapsWrapper>
+          ) : (
+            <ReportForm />
+          )}
         </motion.div>
       </main>
     </div>
