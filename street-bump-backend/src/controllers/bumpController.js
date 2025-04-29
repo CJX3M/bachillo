@@ -1,4 +1,5 @@
 const { db, bucket } = require('../config/firebase');
+const sharp = require('sharp');
 
 const bumpController = {
     // Get all verified bumps
@@ -6,6 +7,7 @@ const bumpController = {
         try {
             const bumpsSnapshot = await db.collection('bumps')
                 .where('verified', '==', true)
+                .where('fixed', '==', false)
                 .get();
             
             const bumps = [];
@@ -29,11 +31,52 @@ const bumpController = {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
+            const createBumpImage = async (base64String) => {
+                try {
+                    if (!base64String) {
+                        throw new Error('Base64 string is empty');
+                    }
+                    if (!base64String?.startsWith("data:image/")) {
+                        throw new Error("Invalid base64 image data");
+                    }
+
+                    const base64Data = base64String.split(",")[1];
+                    const imageBuffer = Buffer.from(base64Data, 'base64');
+                    console.log('Image buffer size:', imageBuffer.length); // Debug log
+                    const resizedImageBuffer = await sharp(imageBuffer)
+                        .resize({ width: 800, height: 600, fit: 'inside' })
+                        .jpeg({ quality: 80 })
+                        .toBuffer();
+                    console.log('Resized image buffer size:', resizedImageBuffer.length); // Debug log
+                    const fileName = `bumps/${Date.now()}.jpg`;
+                    const file = bucket.file(fileName);
+                    console.log('File name:', fileName); // Debug log
+                    await file.save(resizedImageBuffer, {
+                        metadata: { contentType: 'image/jpeg' },
+                        public: true,
+                        validation: 'md5',
+                    });
+                    console.log('File saved to bucket:', fileName); // Debug log
+                    const [publicUrl] = await file.getSignedUrl({
+                        action: 'read',
+                        expires: Date.now() + 24 * 60 * 60 * 1000, // 1 day
+                    });
+                    console.log('Public URL:', publicUrl); // Debug log
+                    return publicUrl;
+                } catch (error) {
+                    console.error('Error creating bump image:', error);
+                    throw new Error('Failed to create bump image');
+                }
+            };
+
+            const imgUrl = await createBumpImage(image);
+
             const bumpData = {
-                imageUrl: image,
+                imageUrl: imgUrl,
                 location: { lat, lng },
                 verified: false,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                fixed: false
             };
 
             const docRef = await db.collection('bumps').add(bumpData);
@@ -129,7 +172,7 @@ const bumpController = {
             console.error('Error deleting bump:', error);
             res.status(500).json({ error: 'Failed to delete bump' });
         }
-    }
+    },
 };
 
 // Helper function to calculate distance between coordinates in kilometers

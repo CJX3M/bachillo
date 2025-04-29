@@ -28,7 +28,7 @@ export default function UnverifiedBumpsList() {
         
         // Fetch addresses for all bumps
         const bumpsWithAddresses = await Promise.all(
-          data.map(async (bump) => {
+          data.map(async (bump: UnverifiedBump) => {
             const address = await getAddressFromCoords(
               bump.location.lat,
               bump.location.lng

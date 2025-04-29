@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build:dev": "env-cmd -f .env.development next build",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
@@ -30,6 +31,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "env-cmd": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
     "postcss": "^8",

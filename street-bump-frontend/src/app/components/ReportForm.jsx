@@ -32,9 +32,9 @@ export default function ReportForm() {
     setShowMapPicker(false);
 
     let processedFile = file;
-    if (file.size > MAX_FILE_SIZE) {
-      processedFile = await imageService.compressImage(file);
-    }
+    // if (file.size > MAX_FILE_SIZE) {
+    //   processedFile = await imageService.compressImage(file);
+    // }
 
     setImageFile(processedFile);
 
@@ -245,7 +245,9 @@ export default function ReportForm() {
                 
                 <div className="p-4 bg-gray-50 rounded-lg mt-4">
                   <p className="text-gray-700 font-medium mb-1">Ubicación:</p>
-                  <LocationDisplay location={location} />
+                  <GoogleMapsWrapper>
+                    <LocationDisplay location={location} />
+                  </GoogleMapsWrapper>
                 </div>
               </div>
 

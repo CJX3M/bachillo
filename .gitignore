@@ -134,3 +134,5 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+.firebase/hosting.c3RyZWV0LWJ1bXAtYWRtaW5cb3V0.cache
+.firebase/hosting.c3RyZWV0LWJ1bXAtZnJvbnRlbmRcb3V0.cache
