@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "bachillo"
+    "default": "bachillo",
+    "development": "bachillo-dev"
   },
   "targets": {
     "bachillo": {

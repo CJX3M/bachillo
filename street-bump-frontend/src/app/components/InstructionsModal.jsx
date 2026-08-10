@@ -6,10 +6,10 @@ export default function InstructionsModal({ isOpen, onClose }) {
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   return (
-    <Dialog 
-      open={isOpen} 
+    <Dialog
+      open={isOpen}
       onClose={onClose}
-      className="relative z-50"
+      className="relative z-[60]"
     >
       <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
       

@@ -5,40 +5,45 @@ import EXIF from "exif-js";
 import { bumpService } from '@/services/bumpService';
 import { googleMapsService } from '@/services/googleMapsService';
 import { imageService } from '@/services/imageService';
-import { CameraIcon, PhotoIcon, PaperAirplaneIcon, XMarkIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
+import { CameraIcon, PhotoIcon, PaperAirplaneIcon, XMarkIcon, QuestionMarkCircleIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { Dialog } from '@headlessui/react';
 import toast from 'react-hot-toast';
 import LocationDisplay from './LocationDisplay';
 import MapPicker from './MapPicker';
 import InstructionsModal from './InstructionsModal';
-import GoogleMapsWrapper from './GoogleMapsWrapper';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-export default function ReportForm() {
+export default function ReportForm({ isOpen, onClose }) {
   const [error, setError] = useState(null);
   const [location, setLocation] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
 
+  const resetState = () => {
+    setError(null);
+    setLocation(null);
+    setImageFile(null);
+    setShowLocationPrompt(false);
+    setShowMapPicker(false);
+  };
+
+  const handleClose = () => {
+    if (loading) return;
+    resetState();
+    onClose();
+  };
+
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
+    if (!file) return;
     setError(null);
     setShowLocationPrompt(false);
     setShowMapPicker(false);
+    setImageFile(file);
 
-    let processedFile = file;
-    // if (file.size > MAX_FILE_SIZE) {
-    //   processedFile = await imageService.compressImage(file);
-    // }
-
-    setImageFile(processedFile);
-
-    EXIF.getData(processedFile, function() {
+    EXIF.getData(file, function() {
       const lat = EXIF.getTag(this, "GPSLatitude");
       const lng = EXIF.getTag(this, "GPSLongitude");
 
@@ -48,42 +53,36 @@ export default function ReportForm() {
         return;
       }
 
-      const coords = {
+      setLocation({
         lat: googleMapsService.parseEXIFCoordinate(lat),
         lng: googleMapsService.parseEXIFCoordinate(lng),
-      };
-      setLocation(coords);
-      setShowPreviewModal(true);
+      });
     });
   };
 
   const handleSubmit = async () => {
     if (!imageFile || !location) return;
-    
+
     setLoading(true);
     setError(null);
-    setShowPreviewModal(false);
 
     const loadingToast = toast.loading('Enviando reporte...');
 
     try {
       const base64Image = await imageService.fileToBase64(imageFile);
-      const bumpData = {
+      await bumpService.createBump({
         image: base64Image,
         lat: location.lat,
         lng: location.lng,
-      };
+      });
 
-      await bumpService.createBump(bumpData);
-      
       toast.dismiss(loadingToast);
       toast.success('¡Reporte enviado exitosamente! Será revisado por un administrador.');
-      
-      setImageFile(null);
-      setLocation(null);
-      setShowPreviewModal(false);
-    } catch (error) {
-      console.error('Error submitting bump:', error);
+
+      resetState();
+      onClose();
+    } catch (err) {
+      console.error('Error submitting bump:', err);
       toast.dismiss(loadingToast);
       toast.error('No se pudo enviar el reporte. Por favor intenta de nuevo.');
       setError('No se pudo enviar el reporte. Por favor intenta de nuevo.');
@@ -93,176 +92,175 @@ export default function ReportForm() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Help button */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowInstructions(true)}
-          className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-          title="Ver instrucciones"
-        >
-          <QuestionMarkCircleIcon className="w-6 h-6" />
-        </button>
-      </div>
-
-      <InstructionsModal 
-        isOpen={showInstructions}
-        onClose={() => setShowInstructions(false)}
-      />
-
-      {/* Image upload buttons */}
-      <div className="flex flex-col gap-4">
-        <label className="block">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          <div className="w-full py-3 px-4 text-center bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
-            <CameraIcon className="w-5 h-5" />
-            Tomar Foto
-          </div>
-        </label>
-
-        <label className="block">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          <div className="w-full py-3 px-4 text-center bg-green-500 text-white rounded-lg cursor-pointer hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
-            <PhotoIcon className="w-5 h-5" />
-            Elegir de Galería
-          </div>
-        </label>
-      </div>
-
-      {/* Location prompt */}
-      {showLocationPrompt && (
-        <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-          <p className="text-yellow-800 mb-3">Esta imagen no contiene datos de ubicación. ¿Deseas usar tu ubicación actual?</p>
-          <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                try {
-                  const currentLocation = await googleMapsService.getCurrentLocation();
-                  setLocation(currentLocation);
-                  setShowLocationPrompt(false);
-                  setError(null);
-                  setShowPreviewModal(true);
-                } catch (err) {
-                  setError("No se pudo obtener la ubicación actual. Por favor usa otra opción.");
-                }
-              }}
-              className="w-full py-2 px-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 flex items-center justify-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-              Usar Ubicación Actual
-            </button>
-            
-            <button
-              onClick={() => {
-                setShowLocationPrompt(false);
-                setShowMapPicker(true);
-                setShowPreviewModal(true);
-              }}
-              className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-              Seleccionar en el Mapa
-            </button>
-
-            <button
-              onClick={() => {
-                setShowLocationPrompt(false);
-                setError("No se puede enviar el reporte sin datos de ubicación.");
-              }}
-              className="w-full py-2 px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Error display */}
-      {error && (
-        <div className="mt-4 p-4 bg-red-50 rounded-lg">
-          <p className="text-red-700">{error}</p>
-        </div>
-      )}
-
-      {/* Preview Modal */}
-      <Dialog 
-        open={Boolean(showPreviewModal && imageFile)}
-        onClose={() => setShowPreviewModal(false)}
-        className="relative z-50"
-      >
+    <>
+      <Dialog open={isOpen} onClose={handleClose} className="relative z-50">
         <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
 
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="mx-auto min-w-[320px] w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-            <div className="relative">
-              <div className="flex justify-between items-start mb-4">
-                <Dialog.Title className="text-xl font-semibold text-gray-900">
-                  Confirmar Reporte de Bache
-                </Dialog.Title>
+        <div className="fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <Dialog.Panel className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:min-w-[320px] sm:max-w-md sm:rounded-2xl">
+            <div className="mb-4 flex items-start justify-between">
+              <Dialog.Title className="text-xl font-semibold text-gray-900">
+                {imageFile ? 'Confirmar Reporte de Bache' : 'Reportar un Bache'}
+              </Dialog.Title>
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setShowPreviewModal(false)}
-                  className="ml-4 rounded-full bg-gray-100 p-1.5 hover:bg-gray-200 transition-colors"
+                  onClick={() => setShowInstructions(true)}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Ver instrucciones"
+                >
+                  <QuestionMarkCircleIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleClose}
+                  className="rounded-full bg-gray-100 p-1.5 hover:bg-gray-200 transition-colors"
                 >
                   <XMarkIcon className="h-4 w-4 text-gray-500" />
                 </button>
               </div>
+            </div>
 
-              <div className="mb-4 rounded-lg overflow-hidden bg-gray-100">
-                <img
-                  src={imageFile ? URL.createObjectURL(imageFile) : ''}
-                  alt="Vista previa"
-                  className="w-full h-52 object-cover"
-                />
-              </div>
-
-              <div className="mb-4">
-                {showMapPicker && (
-                  <div className="mb-4">
-                    <p className="text-gray-700 font-medium mb-2">Selecciona la ubicación del bache:</p>
-                    <GoogleMapsWrapper>
-                      <MapPicker
-                        onLocationSelect={(newLocation) => setLocation(newLocation)}
-                        initialLocation={location}
-                      />
-                    </GoogleMapsWrapper>
+            {/* Step 1: pick a photo */}
+            {!imageFile && (
+              <div className="flex flex-col gap-3">
+                <label className="block">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <div className="w-full py-3.5 px-4 text-center bg-primary-600 text-white rounded-xl cursor-pointer hover:brightness-95 transition-[filter] flex items-center justify-center gap-2 font-medium">
+                    <CameraIcon className="w-5 h-5" />
+                    Tomar Foto
                   </div>
-                )}
-                
-                <div className="p-4 bg-gray-50 rounded-lg mt-4">
-                  <p className="text-gray-700 font-medium mb-1">Ubicación:</p>
-                  <GoogleMapsWrapper>
-                    <LocationDisplay location={location} />
-                  </GoogleMapsWrapper>
+                </label>
+
+                <label className="block">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <div className="w-full py-3.5 px-4 text-center bg-primary-100 text-primary-900 rounded-xl cursor-pointer hover:bg-orange-200 transition-colors flex items-center justify-center gap-2 font-medium">
+                    <PhotoIcon className="w-5 h-5" />
+                    Elegir de Galería
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {/* Missing location prompt */}
+            {showLocationPrompt && (
+              <div className="mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                <p className="text-yellow-800 mb-3 text-sm">Esta imagen no contiene datos de ubicación. ¿Deseas usar tu ubicación actual?</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const currentLocation = await googleMapsService.getCurrentLocation();
+                        setLocation(currentLocation);
+                        setShowLocationPrompt(false);
+                        setError(null);
+                      } catch (err) {
+                        setError("No se pudo obtener la ubicación actual. Por favor usa otra opción.");
+                      }
+                    }}
+                    className="w-full py-2.5 px-4 bg-primary-600 text-white rounded-lg hover:brightness-95 flex items-center justify-center gap-2 text-sm font-medium"
+                  >
+                    <MapPinIcon className="h-5 w-5" />
+                    Usar Ubicación Actual
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowLocationPrompt(false);
+                      setShowMapPicker(true);
+                    }}
+                    className="w-full py-2.5 px-4 bg-primary-100 text-primary-900 rounded-lg hover:bg-orange-200 flex items-center justify-center gap-2 text-sm font-medium"
+                  >
+                    Seleccionar en el Mapa
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowLocationPrompt(false);
+                      setImageFile(null);
+                      setError("No se puede enviar el reporte sin datos de ubicación.");
+                    }}
+                    className="w-full py-2 px-4 text-gray-500 hover:text-gray-700 text-sm"
+                  >
+                    Cancelar
+                  </button>
                 </div>
               </div>
+            )}
 
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !location}
-                className="w-full py-3 px-4 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
-              >
-                <PaperAirplaneIcon className="w-5 h-5" />
-                {loading ? 'Enviando...' : !location ? 'Selecciona una ubicación' : 'Confirmar y Enviar'}
-              </button>
-            </div>
+            {/* Error display */}
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 rounded-lg">
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Step 2: confirm and submit */}
+            {imageFile && !showLocationPrompt && (
+              <div className="relative">
+                <div className="mb-4 rounded-xl overflow-hidden bg-gray-100">
+                  <img
+                    src={URL.createObjectURL(imageFile)}
+                    alt="Vista previa"
+                    className="w-full h-52 object-cover"
+                  />
+                </div>
+
+                {showMapPicker && (
+                  <div className="mb-4">
+                    <p className="text-gray-700 font-medium mb-2 text-sm">Selecciona la ubicación del bache:</p>
+                    <MapPicker
+                      onLocationSelect={(newLocation) => setLocation(newLocation)}
+                      initialLocation={location}
+                    />
+                  </div>
+                )}
+
+                <div className="p-4 bg-gray-50 rounded-xl mb-4">
+                  <p className="text-gray-700 font-medium mb-1 text-sm">Ubicación:</p>
+                  <LocationDisplay location={location} />
+                </div>
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading || !location}
+                  className="w-full py-3.5 px-4 bg-primary-600 text-white rounded-xl hover:brightness-95 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-[filter] font-medium"
+                >
+                  <PaperAirplaneIcon className="w-5 h-5" />
+                  {loading ? 'Enviando...' : !location ? 'Selecciona una ubicación' : 'Confirmar y Enviar'}
+                </button>
+
+                {!loading && (
+                  <button
+                    onClick={() => {
+                      setImageFile(null);
+                      setLocation(null);
+                      setShowMapPicker(false);
+                    }}
+                    className="w-full py-2 mt-2 text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Elegir otra foto
+                  </button>
+                )}
+              </div>
+            )}
           </Dialog.Panel>
         </div>
       </Dialog>
-    </div>
+
+      <InstructionsModal
+        isOpen={showInstructions}
+        onClose={() => setShowInstructions(false)}
+      />
+    </>
   );
 }

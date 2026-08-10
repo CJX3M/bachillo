@@ -28,13 +28,15 @@ export default function BumpMap() {
   const [selectedBump, setSelectedBump] = useState(null);
   const [visibleBumps, setVisibleBumps] = useState([]);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshingNearby, setRefreshingNearby] = useState(false);
   const [error, setError] = useState(null);
   const [showList, setShowList] = useState(false);
   const [center, setCenter] = useState({
     lat: 29.0729,
     lng: -110.9559
   });
+  const [zoom, setZoom] = useState(14);
 
   const lastFetchRef = useRef({
     position: null,
@@ -50,9 +52,14 @@ export default function BumpMap() {
       lat: mapCenter.lat(),
       lng: mapCenter.lng()
     };
-    
-    setCenter(currentPosition);
-    
+
+    // Note: we intentionally do NOT feed this back into the `center` state.
+    // `center` is only a controlled prop for the map's *initial* position;
+    // GoogleMap.setCenter() is called whenever that prop's object reference
+    // changes, even if lat/lng are identical, which would re-trigger `idle`
+    // and fetch nearby bumps in an endless loop while the user isn't moving.
+    setZoom(map.getZoom());
+
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchRef.current.timestamp;
     
@@ -72,20 +79,20 @@ export default function BumpMap() {
 
     const fetchNearbyBumps = async () => {
       try {
-        setLoading(true);
+        setRefreshingNearby(true);
         const nearbyBumps = await googleMapsService.fetchBumpsInRadius(currentPosition);
         setVisibleBumps(nearbyBumps);
-        
+
         // Update last fetch reference
         lastFetchRef.current = {
           position: currentPosition,
           timestamp: now
         };
       } catch (error) {
+        // Non-blocking: keep showing the map and the last known markers
         console.error('Failed to fetch nearby bumps:', error);
-        setError('Failed to fetch nearby bumps');
       } finally {
-        setLoading(false);
+        setRefreshingNearby(false);
       }
     };
     
@@ -118,7 +125,7 @@ export default function BumpMap() {
         setBumps([]);
         setVisibleBumps([]);
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     };
     fetchBumps();
@@ -126,11 +133,9 @@ export default function BumpMap() {
 
   const onMapChange = () => {
     if (!map) return;
-    const mapCenter = map.getCenter();
-    setCenter({
-      lat: mapCenter.lat(),
-      lng: mapCenter.lng()
-    });
+    // Same reasoning as onMapIdle: don't echo the map's own center back
+    // into the `center` prop, only track zoom (a primitive, safe to sync).
+    setZoom(map.getZoom());
   };
 
   const formatDate = (dateString) => {
@@ -147,8 +152,8 @@ export default function BumpMap() {
     return (
       <GoogleMap
         center={center}
-        zoom={14}
-        mapContainerStyle={{ width: "100%", height: "100vh" }}
+        zoom={zoom}
+        mapContainerStyle={{ width: "100%", height: "100%" }}
         onLoad={setMap}
         onIdle={onMapIdle}
         onDragEnd={onMapChange}
@@ -196,17 +201,39 @@ export default function BumpMap() {
     );
   };
 
-  if (loading) return <div>Loading data...</div>;
-  if (error) return <div>{error}</div>;
+  if (initialLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-primary-50">
+        <p className="text-primary-900">Cargando datos...</p>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-primary-50">
+        <p className="text-red-700">{error}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative h-full w-full">
-      {renderMap()}
+    <>
+      <div className="fixed inset-0 z-0">
+        {renderMap()}
+      </div>
+
+      {/* Non-blocking indicator while nearby bumps refresh in the background */}
+      {refreshingNearby && (
+        <div className="fixed top-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-white/90 px-4 py-1.5 text-xs font-medium text-primary-900 shadow-lg backdrop-blur-md">
+          Actualizando baches cercanos...
+        </div>
+      )}
 
       {/* List Toggle Button */}
       <button
         onClick={() => setShowList(true)}
-        className="absolute top-4 left-4 z-10 bg-white p-3 rounded-full shadow-lg"
+        className="fixed bottom-6 left-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-primary-900 shadow-2xl hover:bg-primary-50 transition-colors"
+        aria-label="Ver lista de baches cercanos"
       >
         <ListBulletIcon className="w-6 h-6" />
       </button>
@@ -214,7 +241,7 @@ export default function BumpMap() {
       {/* Overlay when list is shown */}
       {showList && (
         <div
-          className="fixed inset-0 bg-black/20 z-20"
+          className="fixed inset-0 bg-black/20 z-40"
           onClick={() => setShowList(false)}
         />
       )}
@@ -227,7 +254,7 @@ export default function BumpMap() {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25 }}
-            className="fixed left-0 top-0 h-full w-80 bg-white shadow-xl z-30"
+            className="fixed left-0 top-0 h-full w-80 max-w-[85vw] bg-white shadow-xl z-50"
           >
             <div className="p-4">
               <div className="flex justify-between items-center mb-4">
@@ -265,7 +292,7 @@ export default function BumpMap() {
                   </div>
                 ))}
 
-                {loading ? (
+                {refreshingNearby ? (
                   <p className="text-center py-4">Loading...</p>
                 ) : (
                   <button
@@ -280,6 +307,6 @@ export default function BumpMap() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
