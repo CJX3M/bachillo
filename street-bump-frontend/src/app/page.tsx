@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import dynamic from 'next/dynamic';
-import GoogleMapsWrapper from './components/GoogleMapsWrapper';
 import ReportForm from './components/ReportForm';
 
 const BumpMap = dynamic(() => import('@/app/components/BumpMap'), {
@@ -21,9 +20,7 @@ export default function HomePage() {
 
   return (
     <div className="relative h-[100dvh] w-screen overflow-hidden bg-primary-50">
-      <GoogleMapsWrapper>
-        <BumpMap />
-      </GoogleMapsWrapper>
+      <BumpMap />
 
       <motion.header
         initial={{ y: -20, opacity: 0 }}

@@ -52,6 +52,7 @@
   },
   "emulators": {
     "functions": {
+      "host": "0.0.0.0",
       "port": 5001
     },
     "firestore": {
@@ -64,6 +65,7 @@
       "port": 5000
     },
     "storage": {
+      "host": "0.0.0.0",
       "port": 9199
     },
     "ui": {

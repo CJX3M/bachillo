@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
 import { bumpService } from '@/services/bumpService';
-import { googleMapsService } from '@/services/googleMapsService';
+import { geocodingService } from '@/services/geocodingService';
+import { tileLayerUrl, tileLayerAttribution } from '@/services/mapTileConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ListBulletIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
@@ -9,14 +11,25 @@ const ITEMS_PER_PAGE = 10;
 const MIN_DISTANCE_TO_UPDATE = 0.5; // 500 meters in kilometers
 const MIN_TIME_BETWEEN_UPDATES = 10000; // 10 seconds
 
+// Small circular marker instead of Leaflet's default pin -- avoids the
+// well-known issue where Leaflet's default marker image paths don't resolve
+// correctly through Next.js's bundler.
+const bumpIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:14px;height:14px;border-radius:9999px;background:#ea580c;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+  popupAnchor: [0, -7],
+});
+
 // Helper function to calculate distance between two points
 function calculateDistance(lat1, lng1, lat2, lng2) {
   const R = 6371; // Earth's radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = 
+  const a =
     Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLng/2) * Math.sin(dLng/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
@@ -32,7 +45,7 @@ export default function BumpMap() {
   const [refreshingNearby, setRefreshingNearby] = useState(false);
   const [error, setError] = useState(null);
   const [showList, setShowList] = useState(false);
-  const [center, setCenter] = useState({
+  const [center] = useState({
     lat: 29.0729,
     lng: -110.9559
   });
@@ -43,26 +56,36 @@ export default function BumpMap() {
     timestamp: 0
   });
 
-  // Handle map idle state
+  // Addresses resolved in the background (bumps reported before addresses were
+  // stored with them) get merged into both the map markers and the list.
+  const applyResolvedAddress = useCallback((bumpId, address) => {
+    const merge = (list) => list.map((b) => (b.id === bumpId ? { ...b, address } : b));
+    setBumps(merge);
+    setVisibleBumps(merge);
+    setSelectedBump((sel) => (sel && sel.id === bumpId ? { ...sel, address } : sel));
+  }, []);
+
+  // Handle map idle state (Leaflet's `moveend` fires after both pan and zoom
+  // settle, same as Google Maps' `idle`)
   const onMapIdle = useCallback(() => {
     if (!map) return;
-    
+
     const mapCenter = map.getCenter();
     const currentPosition = {
-      lat: mapCenter.lat(),
-      lng: mapCenter.lng()
+      lat: mapCenter.lat,
+      lng: mapCenter.lng
     };
 
     // Note: we intentionally do NOT feed this back into the `center` state.
-    // `center` is only a controlled prop for the map's *initial* position;
-    // GoogleMap.setCenter() is called whenever that prop's object reference
-    // changes, even if lat/lng are identical, which would re-trigger `idle`
-    // and fetch nearby bumps in an endless loop while the user isn't moving.
+    // `center` is only used for the map's *initial* position; re-rendering
+    // MapContainer with a new `center` prop does not recenter an existing
+    // map instance, so there is no loop risk here, but we still avoid
+    // treating it as a controlled value for consistency with `zoom` below.
     setZoom(map.getZoom());
 
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchRef.current.timestamp;
-    
+
     // Skip if we haven't moved far enough or if not enough time has passed
     if (lastFetchRef.current.position) {
       const distance = calculateDistance(
@@ -71,7 +94,7 @@ export default function BumpMap() {
         currentPosition.lat,
         currentPosition.lng
       );
-      
+
       if (distance < MIN_DISTANCE_TO_UPDATE && timeSinceLastFetch < MIN_TIME_BETWEEN_UPDATES) {
         return;
       }
@@ -80,7 +103,11 @@ export default function BumpMap() {
     const fetchNearbyBumps = async () => {
       try {
         setRefreshingNearby(true);
-        const nearbyBumps = await googleMapsService.fetchBumpsInRadius(currentPosition);
+        const nearbyBumps = await geocodingService.fetchBumpsInRadius(
+          currentPosition,
+          5,
+          applyResolvedAddress
+        );
         setVisibleBumps(nearbyBumps);
 
         // Update last fetch reference
@@ -95,19 +122,15 @@ export default function BumpMap() {
         setRefreshingNearby(false);
       }
     };
-    
-    fetchNearbyBumps();
-  }, [map]);
 
-  // Get address from coordinates
-  const getAddressFromCoords = async (lat, lng) => {
-    try {
-      const address = await googleMapsService.getAddressFromCoordinates(lat, lng);
-      return address || "Unknown location";
-    } catch (error) {
-      return "Unknown location";
-    }
-  };
+    fetchNearbyBumps();
+  }, [map, applyResolvedAddress]);
+
+  useEffect(() => {
+    if (!map) return;
+    map.on('moveend', onMapIdle);
+    return () => map.off('moveend', onMapIdle);
+  }, [map, onMapIdle]);
 
   useEffect(() => {
     const fetchBumps = async () => {
@@ -117,8 +140,11 @@ export default function BumpMap() {
         if (!Array.isArray(data)) {
           throw new Error('Invalid data format received from API');
         }
-        setBumps(data);
-        setVisibleBumps(data.slice(0, ITEMS_PER_PAGE));
+        // Use stored/cached addresses only; the rest are resolved lazily for
+        // the items actually shown (see the list effect below).
+        const withKnown = geocodingService.withAddresses(data);
+        setBumps(withKnown);
+        setVisibleBumps(withKnown.slice(0, ITEMS_PER_PAGE));
       } catch (error) {
         console.error('Failed to fetch bumps:', error);
         setError('Failed to fetch bumps');
@@ -131,12 +157,14 @@ export default function BumpMap() {
     fetchBumps();
   }, []);
 
-  const onMapChange = () => {
-    if (!map) return;
-    // Same reasoning as onMapIdle: don't echo the map's own center back
-    // into the `center` prop, only track zoom (a primitive, safe to sync).
-    setZoom(map.getZoom());
-  };
+  // Resolve missing addresses only for the list rows that are on screen.
+  useEffect(() => {
+    if (!showList) return;
+    geocodingService.withAddresses(bumps.slice(0, page * ITEMS_PER_PAGE), applyResolvedAddress);
+    // `bumps` intentionally omitted: it changes on every resolved address, and
+    // the queue already de-duplicates, so only list/page changes should trigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showList, page, applyResolvedAddress]);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString('es-MX', {
@@ -150,37 +178,27 @@ export default function BumpMap() {
 
   const renderMap = () => {
     return (
-      <GoogleMap
+      <MapContainer
         center={center}
         zoom={zoom}
-        mapContainerStyle={{ width: "100%", height: "100%" }}
-        onLoad={setMap}
-        onIdle={onMapIdle}
-        onDragEnd={onMapChange}
-        onZoomChanged={onMapChange}
+        style={{ width: "100%", height: "100%" }}
+        ref={setMap}
       >
+        <TileLayer url={tileLayerUrl} attribution={tileLayerAttribution} />
+
         {visibleBumps.map((bump) => (
           <Marker
             key={bump.id}
-            position={{
-              lat: bump.location.lat,
-              lng: bump.location.lng
-            }}
-            onClick={() => setSelectedBump(bump)}
-            // icon={{
-            //   url: "/bump-icon.png",
-            //   scaledSize: new window.google.maps.Size(30, 30)
-            // }}
+            position={[bump.location.lat, bump.location.lng]}
+            icon={bumpIcon}
+            eventHandlers={{ click: () => setSelectedBump(bump) }}
           />
         ))}
 
         {selectedBump && (
-          <InfoWindow
-            position={{
-              lat: selectedBump.location.lat,
-              lng: selectedBump.location.lng
-            }}
-            onCloseClick={() => setSelectedBump(null)}
+          <Popup
+            position={[selectedBump.location.lat, selectedBump.location.lng]}
+            eventHandlers={{ remove: () => setSelectedBump(null) }}
           >
             <div className="max-w-xs">
               <img
@@ -195,9 +213,9 @@ export default function BumpMap() {
                 {formatDate(selectedBump.createdAt)}
               </p>
             </div>
-          </InfoWindow>
+          </Popup>
         )}
-      </GoogleMap>
+      </MapContainer>
     );
   };
 
@@ -263,7 +281,7 @@ export default function BumpMap() {
                   <XMarkIcon className="w-6 h-6" />
                 </button>
               </div>
-              
+
               <div className="overflow-y-auto h-[calc(100vh-5rem)]">
                 {bumps.slice(0, page * ITEMS_PER_PAGE).map((bump) => (
                   <div
@@ -271,10 +289,7 @@ export default function BumpMap() {
                     className="flex items-center p-2 border-b cursor-pointer hover:bg-gray-100"
                     onClick={() => {
                       setSelectedBump(bump);
-                      map?.panTo({
-                        lat: bump.location.lat,
-                        lng: bump.location.lng
-                      });
+                      map?.panTo([bump.location.lat, bump.location.lng]);
                       setShowList(false);
                     }}
                   >

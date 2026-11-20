@@ -1,20 +1,24 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import EXIF from "exif-js";
 import { bumpService } from '@/services/bumpService';
-import { googleMapsService } from '@/services/googleMapsService';
+import { geocodingService } from '@/services/geocodingService';
 import { imageService } from '@/services/imageService';
 import { CameraIcon, PhotoIcon, PaperAirplaneIcon, XMarkIcon, QuestionMarkCircleIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { Dialog } from '@headlessui/react';
 import toast from 'react-hot-toast';
 import LocationDisplay from './LocationDisplay';
-import MapPicker from './MapPicker';
 import InstructionsModal from './InstructionsModal';
+
+// Leaflet touches `window` on load, so it can't be part of the server-rendered bundle.
+const MapPicker = dynamic(() => import('./MapPicker'), { ssr: false });
 
 export default function ReportForm({ isOpen, onClose }) {
   const [error, setError] = useState(null);
   const [location, setLocation] = useState(null);
+  const [address, setAddress] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
@@ -24,6 +28,7 @@ export default function ReportForm({ isOpen, onClose }) {
   const resetState = () => {
     setError(null);
     setLocation(null);
+    setAddress(null);
     setImageFile(null);
     setShowLocationPrompt(false);
     setShowMapPicker(false);
@@ -53,9 +58,25 @@ export default function ReportForm({ isOpen, onClose }) {
         return;
       }
 
+      // EXIF stores coordinates unsigned; the S/W reference letters carry the sign
+      // (Hermosillo is west of Greenwich, so its longitude must be negative).
+      const latRef = EXIF.getTag(this, "GPSLatitudeRef");
+      const lngRef = EXIF.getTag(this, "GPSLongitudeRef");
+      const parsedLat = geocodingService.parseEXIFCoordinate(lat);
+      const parsedLng = geocodingService.parseEXIFCoordinate(lng);
+
+      // Some phone cameras write malformed GPS tags (e.g. 0/0 rationals) that parse to
+      // NaN/Infinity; treat those as "no location" instead of feeding them to the map.
+      if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng) ||
+          Math.abs(parsedLat) > 90 || Math.abs(parsedLng) > 180) {
+        setShowLocationPrompt(true);
+        setLocation(null);
+        return;
+      }
+
       setLocation({
-        lat: googleMapsService.parseEXIFCoordinate(lat),
-        lng: googleMapsService.parseEXIFCoordinate(lng),
+        lat: latRef === 'S' ? -parsedLat : parsedLat,
+        lng: lngRef === 'W' ? -parsedLng : parsedLng,
       });
     });
   };
@@ -74,6 +95,7 @@ export default function ReportForm({ isOpen, onClose }) {
         image: base64Image,
         lat: location.lat,
         lng: location.lng,
+        ...(address ? { address } : {}),
       });
 
       toast.dismiss(loadingToast);
@@ -159,12 +181,16 @@ export default function ReportForm({ isOpen, onClose }) {
                   <button
                     onClick={async () => {
                       try {
-                        const currentLocation = await googleMapsService.getCurrentLocation();
+                        const currentLocation = await geocodingService.getCurrentLocation();
                         setLocation(currentLocation);
                         setShowLocationPrompt(false);
                         setError(null);
                       } catch (err) {
-                        setError("No se pudo obtener la ubicación actual. Por favor usa otra opción.");
+                        // Can't read the device position (denied, or an insecure http page):
+                        // fall back to picking the point on the map.
+                        setShowLocationPrompt(false);
+                        setShowMapPicker(true);
+                        setError("No se pudo obtener tu ubicación. Elige el punto del bache en el mapa.");
                       }
                     }}
                     className="w-full py-2.5 px-4 bg-primary-600 text-white rounded-lg hover:brightness-95 flex items-center justify-center gap-2 text-sm font-medium"
@@ -215,6 +241,15 @@ export default function ReportForm({ isOpen, onClose }) {
                   />
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => setShowMapPicker((v) => !v)}
+                  className="w-full py-2.5 px-4 mb-4 bg-primary-100 text-primary-900 rounded-xl hover:bg-orange-200 flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+                >
+                  <MapPinIcon className="h-5 w-5" />
+                  {showMapPicker ? 'Ocultar mapa' : location ? 'Ajustar ubicación en el mapa' : 'Elegir ubicación en el mapa'}
+                </button>
+
                 {showMapPicker && (
                   <div className="mb-4">
                     <p className="text-gray-700 font-medium mb-2 text-sm">Selecciona la ubicación del bache:</p>
@@ -227,7 +262,7 @@ export default function ReportForm({ isOpen, onClose }) {
 
                 <div className="p-4 bg-gray-50 rounded-xl mb-4">
                   <p className="text-gray-700 font-medium mb-1 text-sm">Ubicación:</p>
-                  <LocationDisplay location={location} />
+                  <LocationDisplay location={location} onAddressResolved={setAddress} />
                 </div>
 
                 <button

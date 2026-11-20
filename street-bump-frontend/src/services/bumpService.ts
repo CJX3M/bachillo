@@ -31,7 +31,7 @@ export const bumpService = {
     }
   },
 
-  async createBump(data: { image: string; lat: number; lng: number }): Promise<Bump> {
+  async createBump(data: { image: string; lat: number; lng: number; address?: string }): Promise<Bump> {
     const response = await fetch(`${API_URL}/bumps`, {
       method: 'POST',
       headers: {
