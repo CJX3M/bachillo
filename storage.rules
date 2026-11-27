@@ -5,6 +5,15 @@ rules_version = '2';
 //    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    // Bump photos are already public in production (uploaded with `public: true`
+    // and served from storage.googleapis.com). Mirror that for the Storage
+    // emulator, which enforces these rules instead of object ACLs. Writes stay
+    // closed: only the backend (Admin SDK, which bypasses rules) uploads.
+    match /bumps/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -1,5 +1,6 @@
 const { db, bucket } = require('../config/firebase');
 const sharp = require('sharp');
+const { selectNearby } = require('../services/nearby');
 
 const bumpController = {
     // Get all verified bumps
@@ -25,13 +26,13 @@ const bumpController = {
     // Create a new bump
     createBump: async (req, res) => {
         try {
-            const { image, lat, lng } = req.body;
+            const { image, lat, lng, address } = req.body;
             
             if (!image || !lat || !lng) {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
-            const createBumpImage = async (base64String) => {
+            const createBumpImage = async (base64String, reqHostname) => {
                 try {
                     if (!base64String) {
                         throw new Error('Base64 string is empty');
@@ -57,10 +58,16 @@ const bumpController = {
                         validation: 'md5',
                     });
                     console.log('File saved to bucket:', fileName); // Debug log
-                    const [publicUrl] = await file.getSignedUrl({
-                        action: 'read',
-                        expires: Date.now() + 24 * 60 * 60 * 1000, // 1 day
-                    });
+                    // The file is public (public: true above), so use its permanent public
+                    // URL. A signed URL was used here before, but with a 24h expiry it made
+                    // every bump image stop loading a day after it was reported.
+                    // Under the Storage emulator the object lives on the emulator, not on
+                    // storage.googleapis.com. Use the hostname the client reached us at so
+                    // other devices on the LAN (e.g. a phone) can load the image too.
+                    const emulatorHost = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+                    const publicUrl = emulatorHost
+                        ? `http://${reqHostname || emulatorHost.split(':')[0]}:${emulatorHost.split(':')[1]}/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media`
+                        : `https://storage.googleapis.com/${bucket.name}/${fileName}`;
                     console.log('Public URL:', publicUrl); // Debug log
                     return publicUrl;
                 } catch (error) {
@@ -69,7 +76,7 @@ const bumpController = {
                 }
             };
 
-            const imgUrl = await createBumpImage(image);
+            const imgUrl = await createBumpImage(image, req.hostname);
 
             const bumpData = {
                 imageUrl: imgUrl,
@@ -78,6 +85,12 @@ const bumpController = {
                 createdAt: new Date().toISOString(),
                 fixed: false
             };
+
+            // Reverse-geocoded by the client once at report time, so the map doesn't
+            // have to geocode every bump on every load. Optional and length-capped.
+            if (typeof address === 'string' && address.trim()) {
+                bumpData.address = address.trim().slice(0, 300);
+            }
 
             const docRef = await db.collection('bumps').add(bumpData);
             res.status(201).json({ id: docRef.id, ...bumpData });
@@ -107,20 +120,10 @@ const bumpController = {
             
             const bumps = [];
             bumpsSnapshot.forEach(doc => {
-                const bump = { id: doc.id, ...doc.data() };
-                const distance = calculateDistance(
-                    centerLat,
-                    centerLng,
-                    bump.location.lat,
-                    bump.location.lng
-                );
-                
-                if (distance <= radiusKm) {
-                    bumps.push({ ...bump, distance });
-                }
+                bumps.push({ id: doc.id, ...doc.data() });
             });
-            
-            res.json(bumps.sort((a, b) => a.distance - b.distance));
+
+            res.json(selectNearby(bumps, { lat: centerLat, lng: centerLng }, radiusKm));
         } catch (error) {
             console.error('Error fetching nearby bumps:', error);
             res.status(500).json({ error: 'Failed to fetch nearby bumps' });
@@ -174,18 +177,5 @@ const bumpController = {
         }
     },
 };
-
-// Helper function to calculate distance between coordinates in kilometers
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // Distance in kilometers
-}
 
 module.exports = bumpController;

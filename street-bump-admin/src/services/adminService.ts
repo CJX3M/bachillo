@@ -2,6 +2,12 @@ import { auth } from '@/config/firebase';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+export const NOT_ADMIN_MESSAGE = 'Esta cuenta no tiene permiso de administrador.';
+
+const assertAllowed = (response: Response) => {
+  if (response.status === 403) throw new Error(NOT_ADMIN_MESSAGE);
+};
+
 export const adminService = {
   async getUnverifiedBumps() {
     try {
@@ -10,8 +16,6 @@ export const adminService = {
         throw new Error('No authentication token available');
       }
 
-      console.log('Token:', token); // Debug log
-
       const response = await fetch(`${API_URL}/admin/bumps/unverified`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -19,6 +23,7 @@ export const adminService = {
         }
       });
 
+      assertAllowed(response);
       if (!response.ok) {
         console.error('API Error:', response.status, await response.text());
         throw new Error(`Failed to fetch unverified bumps: ${response.status}`);
@@ -42,8 +47,46 @@ export const adminService = {
       }
     });
 
+    assertAllowed(response);
     if (!response.ok) {
       throw new Error('Failed to verify bump');
+    }
+
+    return response.json();
+  },
+
+  async getFixedBumps() {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('No authentication token available');
+
+    const response = await fetch(`${API_URL}/admin/bumps/fixed`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    assertAllowed(response);
+    if (!response.ok) {
+      throw new Error('Failed to fetch fixed bumps');
+    }
+
+    return response.json();
+  },
+
+  async reopenBump(id: string): Promise<{ id: string; fixed: boolean }> {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('No authentication token available');
+
+    const response = await fetch(`${API_URL}/admin/bumps/${id}/reopen`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    assertAllowed(response);
+    if (!response.ok) {
+      throw new Error('Failed to reopen bump');
     }
 
     return response.json();
@@ -60,6 +103,7 @@ export const adminService = {
       }
     });
 
+    assertAllowed(response);
     if (!response.ok) {
       throw new Error('Failed to delete bump');
     }

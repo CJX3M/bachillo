@@ -31,7 +31,7 @@ export const bumpService = {
     }
   },
 
-  async createBump(data: { image: string; lat: number; lng: number }): Promise<Bump> {
+  async createBump(data: { image: string; lat: number; lng: number; address?: string }): Promise<Bump> {
     const response = await fetch(`${API_URL}/bumps`, {
       method: 'POST',
       headers: {
@@ -45,6 +45,25 @@ export const bumpService = {
     }
 
     return response.json();
+  },
+
+  // `null` when the bump does not exist or has not been approved.
+  async getBump(id: string): Promise<(Omit<Bump, 'verified'> & { fixed: boolean }) | null> {
+    const response = await fetch(`${API_URL}/bumps/${encodeURIComponent(id)}`);
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Failed to fetch bump: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async markFixed(id: string): Promise<void> {
+    const response = await fetch(`${API_URL}/bumps/${encodeURIComponent(id)}/fixed`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to mark bump as fixed: ${response.status}`);
+    }
   },
 
   async getNearbyBumps(center: { lat: number; lng: number }, radius: number = 5): Promise<Bump[]> {

@@ -1,12 +1,16 @@
 {
   "projects": {
-    "default": "bachillo"
+    "default": "bachillo",
+    "development": "bachillo-dev"
   },
   "targets": {
     "bachillo": {
       "hosting": {
         "frontend": [
           "bachillo"
+        ],
+        "frontend-v1": [
+          "bachillo-v1"
         ],
         "admin": [
           "bachillo-admin"

@@ -1,27 +1,36 @@
 const { auth } = require('firebase-admin');
 
-const verifyAdminToken = async (req, res, next) => {
+const parseAdminEmails = (value) =>
+  (value || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+// A valid Firebase token only proves "someone signed in to this project"; admin
+// actions also require the account to be on the allow list.
+const makeVerifyAdminToken = ({ verifyIdToken, getAdminEmails }) => async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
   try {
-    const authHeader = req.headers.authorization;
-    console.log('Auth Header:', authHeader); // Debug log
-
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.log('No bearer token found');
-      return res.status(401).json({ error: 'No token provided' });
+    const decodedToken = await verifyIdToken(authHeader.slice('Bearer '.length));
+    const email = decodedToken.email?.toLowerCase();
+    if (decodedToken.email_verified !== true || !getAdminEmails().includes(email)) {
+      return res.status(403).json({ error: 'Not an admin account' });
     }
-
-    const token = authHeader.split('Bearer ')[1];
-    console.log('Verifying token...'); // Debug log
-
-    const decodedToken = await auth().verifyIdToken(token);
-    console.log('Decoded token:', decodedToken); // Debug log
-
     req.user = decodedToken;
     next();
   } catch (error) {
-    console.error('Auth error:', error);
+    console.error('Auth error:', error.message);
     res.status(403).json({ error: 'Unauthorized access' });
   }
 };
 
-module.exports = { verifyAdminToken };
+const verifyAdminToken = makeVerifyAdminToken({
+  verifyIdToken: (token) => auth().verifyIdToken(token),
+  getAdminEmails: () => parseAdminEmails(process.env.ADMIN_EMAILS),
+});
+
+module.exports = { parseAdminEmails, makeVerifyAdminToken, verifyAdminToken };

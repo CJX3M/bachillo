@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { adminService } from '@/services/adminService';
+import { adminService, NOT_ADMIN_MESSAGE } from '@/services/adminService';
 import { getAddressFromCoords } from '@/services/geocodingService';
 
 interface UnverifiedBump {
@@ -15,6 +15,9 @@ interface UnverifiedBump {
   imageUrl: string;
   createdAt: string;
 }
+
+const errorMessage = (err: unknown, fallback: string) =>
+  err instanceof Error && err.message === NOT_ADMIN_MESSAGE ? NOT_ADMIN_MESSAGE : fallback;
 
 export default function UnverifiedBumpsList() {
   const [bumps, setBumps] = useState<UnverifiedBump[]>([]);
@@ -40,7 +43,7 @@ export default function UnverifiedBumpsList() {
         setBumps(bumpsWithAddresses);
       } catch (err) {
         console.error('Error:', err);
-        setError('Failed to fetch unverified bumps');
+        setError(errorMessage(err, 'Failed to fetch unverified bumps'));
       } finally {
         setLoading(false);
       }
@@ -53,8 +56,8 @@ export default function UnverifiedBumpsList() {
     try {
       await adminService.verifyBump(id);
       setBumps(bumps.filter(bump => bump.id !== id));
-    } catch {
-      setError('Failed to verify bump');
+    } catch (err) {
+      setError(errorMessage(err, 'Failed to verify bump'));
     }
   };
 
@@ -62,8 +65,8 @@ export default function UnverifiedBumpsList() {
     try {
       await adminService.deleteBump(id);
       setBumps(bumps.filter(bump => bump.id !== id));
-    } catch {
-      setError('Failed to delete bump');
+    } catch (err) {
+      setError(errorMessage(err, 'Failed to delete bump'));
     }
   };
 

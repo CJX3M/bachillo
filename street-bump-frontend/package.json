@@ -4,18 +4,17 @@
   "private": true,
   "scripts": {
     "build:dev": "env-cmd -f .env.development next build",
+    "build:v1": "env-cmd -f .env.development next build && node -e \"require('fs').cpSync('out','out-v1',{recursive:true,force:true})\"",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@googlemaps/google-maps-services-js": "^3.4.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@mui/icons-material": "^6.4.2",
     "@mui/material": "^6.4.2",
-    "@react-google-maps/api": "^2.20.5",
     "exif-js": "^2.3.0",
     "firebase": "^11.2.0",
     "framer-motion": "^12.4.1",
