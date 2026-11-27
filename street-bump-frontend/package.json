@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build:dev": "env-cmd -f .env.development next build",
+    "build:v1": "env-cmd -f .env.development next build && node -e \"require('fs').cpSync('out','out-v1',{recursive:true,force:true})\"",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",

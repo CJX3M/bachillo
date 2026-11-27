@@ -33,6 +33,24 @@
       ]
     },
     {
+      "target": "frontend-v1",
+      "public": "street-bump-frontend/out-v1",
+      "cleanUrls": true,
+      "rewrites": [
+        {
+          "source": "/bachesNuevos",
+          "function": {
+            "functionId": "api",
+            "region": "us-central1"
+          }
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
       "target": "admin",
       "public": "street-bump-admin/out",
       "cleanUrls": true,

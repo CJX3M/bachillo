@@ -9,6 +9,9 @@
         "frontend": [
           "bachillo"
         ],
+        "frontend-v1": [
+          "bachillo-v1"
+        ],
         "admin": [
           "bachillo-admin"
         ]
