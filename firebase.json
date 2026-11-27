@@ -5,7 +5,7 @@
   },
   "functions": {
     "source": "street-bump-backend",
-    "runtime": "nodejs20",
+    "runtime": "nodejs22",
     "ignore": [
       "node_modules",
       ".git",
@@ -26,6 +26,13 @@
       "public": "street-bump-frontend/out",
       "cleanUrls": true,
       "rewrites": [
+        {
+          "source": "/bachesNuevos",
+          "function": {
+            "functionId": "api",
+            "region": "us-central1"
+          }
+        },
         {
           "source": "**",
           "destination": "/index.html"
