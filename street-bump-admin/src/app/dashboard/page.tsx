@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import UnverifiedBumpsList from '@/components/UnverifiedBumpsList';
 import FixedBumpsList from '@/components/FixedBumpsList';
+import XReportCard from '@/components/XReportCard';
 import { useEffect } from 'react';
 
 export default function DashboardPage() {
@@ -20,6 +21,8 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6">
+      <XReportCard />
+
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Reportes Pendientes</h1>
       </header>

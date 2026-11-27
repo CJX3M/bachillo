@@ -8,7 +8,32 @@ const assertAllowed = (response: Response) => {
   if (response.status === 403) throw new Error(NOT_ADMIN_MESSAGE);
 };
 
+export interface YesterdayReport {
+  day: string;
+  count: number;
+  text: string | null;
+  hasMention: boolean;
+}
+
 export const adminService = {
+  async getYesterdayReport(): Promise<YesterdayReport> {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('No authentication token available');
+
+    const response = await fetch(`${API_URL}/admin/report/yesterday`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    assertAllowed(response);
+    if (!response.ok) {
+      throw new Error('Failed to fetch yesterday report');
+    }
+
+    return response.json();
+  },
+
   async getUnverifiedBumps() {
     try {
       const token = await auth.currentUser?.getIdToken(true); // Force token refresh

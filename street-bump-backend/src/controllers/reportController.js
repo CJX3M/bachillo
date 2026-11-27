@@ -1,6 +1,7 @@
 const { yesterdayRange } = require('../services/yesterday');
 const { permanentPhotoUrl } = require('../services/photoUrl');
 const { renderReportPage } = require('../services/reportPage');
+const { buildXPost, normalizeHandle } = require('../services/xPost');
 
 // LocationIQ's free plan allows 2 requests per second.
 const GEOCODE_GAP_MS = 600;
@@ -67,4 +68,23 @@ function createReportHandler({
     };
 }
 
-module.exports = { getYesterdayBumps, createReportHandler };
+// What the admin needs to post yesterday's report on X by hand.
+function createXPostHandler({ db, now = () => new Date(), baseUrl, handle }) {
+    return async (req, res) => {
+        try {
+            const { day } = yesterdayRange(now());
+            const count = (await getYesterdayBumps({ db, now })).length;
+            res.json({
+                day,
+                count,
+                text: buildXPost({ count, day, baseUrl, handle }),
+                hasMention: normalizeHandle(handle) !== null,
+            });
+        } catch (error) {
+            console.error('Error building the X post:', error);
+            res.status(500).json({ error: 'Failed to build the report' });
+        }
+    };
+}
+
+module.exports = { getYesterdayBumps, createReportHandler, createXPostHandler };
