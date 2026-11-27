@@ -55,6 +55,43 @@ export const adminService = {
     return response.json();
   },
 
+  async getFixedBumps() {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('No authentication token available');
+
+    const response = await fetch(`${API_URL}/admin/bumps/fixed`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    assertAllowed(response);
+    if (!response.ok) {
+      throw new Error('Failed to fetch fixed bumps');
+    }
+
+    return response.json();
+  },
+
+  async reopenBump(id: string): Promise<{ id: string; fixed: boolean }> {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('No authentication token available');
+
+    const response = await fetch(`${API_URL}/admin/bumps/${id}/reopen`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    assertAllowed(response);
+    if (!response.ok) {
+      throw new Error('Failed to reopen bump');
+    }
+
+    return response.json();
+  },
+
   async deleteBump(id: string): Promise<{ success: boolean }> {
     const token = await auth.currentUser?.getIdToken();
     if (!token) throw new Error('No authentication token available');

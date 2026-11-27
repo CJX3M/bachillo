@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import UnverifiedBumpsList from '@/components/UnverifiedBumpsList';
+import FixedBumpsList from '@/components/FixedBumpsList';
 import { useEffect } from 'react';
 
 export default function DashboardPage() {
@@ -24,6 +25,9 @@ export default function DashboardPage() {
       </header>
 
       <UnverifiedBumpsList />
+
+      <h2 className="text-xl font-bold mt-10 mb-4">Atendidos</h2>
+      <FixedBumpsList />
     </div>
   );
 }
