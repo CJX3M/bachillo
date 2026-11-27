@@ -6,6 +6,7 @@ import { geocodingService } from '@/services/geocodingService';
 import { tileLayerUrl, tileLayerAttribution } from '@/services/mapTileConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ListBulletIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const ITEMS_PER_PAGE = 10;
 const MIN_DISTANCE_TO_UPDATE = 0.5; // 500 meters in kilometers
@@ -50,6 +51,9 @@ export default function BumpMap() {
     lng: -110.9559
   });
   const [zoom, setZoom] = useState(14);
+
+  const [markingFixed, setMarkingFixed] = useState(false);
+  const deepLinkHandledRef = useRef(false);
 
   const lastFetchRef = useRef({
     position: null,
@@ -157,6 +161,49 @@ export default function BumpMap() {
     fetchBumps();
   }, []);
 
+  // Direct link from the daily report: /?bache=<id> opens that bump.
+  useEffect(() => {
+    if (!map || deepLinkHandledRef.current) return;
+    deepLinkHandledRef.current = true;
+    const id = new URLSearchParams(window.location.search).get('bache');
+    if (!id) return;
+
+    const openBump = async () => {
+      try {
+        const bump = await bumpService.getBump(id);
+        if (!bump || bump.fixed) {
+          toast('Ese bache ya fue atendido o no existe.');
+          return;
+        }
+        const [known] = geocodingService.withAddresses([bump], applyResolvedAddress);
+        map.setView([known.location.lat, known.location.lng], 17);
+        setVisibleBumps((list) => [...list.filter((b) => b.id !== known.id), known]);
+        setSelectedBump(known);
+      } catch (error) {
+        console.error('Failed to open linked bump:', error);
+        toast.error('No se pudo cargar el bache.');
+      }
+    };
+    openBump();
+  }, [map, applyResolvedAddress]);
+
+  const handleMarkFixed = async (id) => {
+    setMarkingFixed(true);
+    try {
+      await bumpService.markFixed(id);
+      const without = (list) => list.filter((b) => b.id !== id);
+      setBumps(without);
+      setVisibleBumps(without);
+      setSelectedBump(null);
+      toast.success('¡Gracias! Marcado como atendido.');
+    } catch (error) {
+      console.error('Failed to mark bump as fixed:', error);
+      toast.error('No se pudo marcar. Intenta de nuevo.');
+    } finally {
+      setMarkingFixed(false);
+    }
+  };
+
   // Resolve missing addresses only for the list rows that are on screen.
   useEffect(() => {
     if (!showList) return;
@@ -212,6 +259,14 @@ export default function BumpMap() {
               <p className="text-xs text-gray-600">
                 {formatDate(selectedBump.createdAt)}
               </p>
+              <button
+                type="button"
+                onClick={() => handleMarkFixed(selectedBump.id)}
+                disabled={markingFixed}
+                className="mt-2 w-full rounded-lg bg-primary-600 py-2 text-sm font-medium text-white disabled:bg-gray-300"
+              >
+                {markingFixed ? 'Enviando...' : 'Marcar como atendido'}
+              </button>
             </div>
           </Popup>
         )}
