@@ -17,6 +17,7 @@ function fakeDb(docsById = {}) {
 
     const query = (filters) => ({
         where: (field, op, value) => query([...filters, [field, op, value]]),
+        orderBy: () => query(filters),
         get: async () => {
             const matches = [...docs.keys()].filter((id) =>
                 filters.every(([field, op, value]) => OPS[op](docs.get(id)[field], value)));

@@ -1,6 +1,10 @@
 const { db, bucket } = require('../config/firebase');
 const sharp = require('sharp');
 const { selectNearby } = require('../services/nearby');
+const { permanentPhotoUrl } = require('../services/photoUrl');
+
+// Old bumps stored signed URLs that have since expired.
+const withPermanentPhoto = (bump) => ({ ...bump, imageUrl: permanentPhotoUrl(bump.imageUrl, bucket.name) });
 
 const bumpController = {
     // Get all verified bumps
@@ -16,7 +20,7 @@ const bumpController = {
                 bumps.push({ id: doc.id, ...doc.data() });
             });
             
-            res.json(bumps);
+            res.json(bumps.map(withPermanentPhoto));
         } catch (error) {
             console.error('Error fetching verified bumps:', error);
             res.status(500).json({ error: 'Failed to fetch bumps' });
@@ -123,7 +127,7 @@ const bumpController = {
                 bumps.push({ id: doc.id, ...doc.data() });
             });
 
-            res.json(selectNearby(bumps, { lat: centerLat, lng: centerLng }, radiusKm));
+            res.json(selectNearby(bumps, { lat: centerLat, lng: centerLng }, radiusKm).map(withPermanentPhoto));
         } catch (error) {
             console.error('Error fetching nearby bumps:', error);
             res.status(500).json({ error: 'Failed to fetch nearby bumps' });
@@ -143,7 +147,7 @@ const bumpController = {
                 bumps.push({ id: doc.id, ...doc.data() });
             });
             
-            res.json(bumps);
+            res.json(bumps.map(withPermanentPhoto));
         } catch (error) {
             console.error('Error fetching unverified bumps:', error);
             res.status(500).json({ error: 'Failed to fetch unverified bumps' });
