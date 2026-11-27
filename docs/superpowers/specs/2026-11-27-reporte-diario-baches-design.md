@@ -100,6 +100,8 @@ que no es admin recibe 403 y la versión nueva está en `bachillo.web.app`.
 
 ## Fase 2: publicación en X
 
+> Sustituida por [publicar en X con un clic](2026-11-27-publicar-en-x-design.md).
+
 - Cuenta nueva dedicada, declarada como automatizada.
 - Función programada diaria a las 8:00 (Hermosillo). Si la lista de ayer está vacía, no publica.
 - Texto: número de baches, liga y mención a la cuenta del gobierno.
