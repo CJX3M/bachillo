@@ -3,9 +3,9 @@ const router = express.Router();
 const { getVerifiedBumps, createBump, getNearbyBumps } = require('../controllers/bumpController');
 const { createFixedController } = require('../controllers/fixedController');
 const { createRateLimit } = require('../middleware/rateLimit');
-const { db } = require('../config/firebase');
+const { db, bucket } = require('../config/firebase');
 
-const { getBump, markFixed } = createFixedController({ db });
+const { getBump, markFixed } = createFixedController({ db, bucketName: bucket.name });
 const markFixedLimit = createRateLimit({ limit: 10, windowMs: 60 * 60 * 1000 });
 
 router.get('/', getVerifiedBumps);

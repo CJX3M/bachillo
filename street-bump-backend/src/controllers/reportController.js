@@ -4,6 +4,8 @@ const { renderReportPage } = require('../services/reportPage');
 
 // LocationIQ's free plan allows 2 requests per second.
 const GEOCODE_GAP_MS = 600;
+// Hosting cuts rewritten requests at 60s: stop looking up addresses well before.
+const GEOCODE_BUDGET_MS = 20000;
 
 // Bumps approved during the previous Hermosillo day that are still unfixed.
 async function getYesterdayBumps({ db, now = () => new Date() }) {
@@ -26,12 +28,16 @@ function createReportHandler({
     baseUrl,
     bucketName,
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    clock = Date.now,
 }) {
     // Older bumps have no stored address: resolve it once and keep it.
     const addMissingAddresses = async (bumps) => {
+        const start = clock();
         let calls = 0;
         for (const bump of bumps) {
             if (bump.address) continue;
+            // The rest show coordinates now and are resolved on a later visit.
+            if (clock() - start >= GEOCODE_BUDGET_MS) break;
             if (calls++) await sleep(GEOCODE_GAP_MS);
             try {
                 const address = await reverseGeocode(bump.location.lat, bump.location.lng);

@@ -80,3 +80,17 @@ test('Firestore errors become 500', async () => {
     assert.strictEqual(res.statusCode, 500);
     assert.ok(res.body.error);
 });
+
+const SIGNED = 'https://storage.googleapis.com/b/bumps/1.jpg?Expires=1&Signature=x';
+const PERMANENT = 'https://storage.googleapis.com/b/bumps/1.jpg';
+
+test('getBump and listFixed replace expired signed photo URLs', async () => {
+    const db = fakeDb({ a: bump({ imageUrl: SIGNED, fixed: true, fixedAt: 'x' }) });
+    const controller = createFixedController({ db, bucketName: 'b' });
+    const one = fakeRes();
+    await controller.getBump({ params: { id: 'a' } }, one);
+    assert.strictEqual(one.body.imageUrl, PERMANENT);
+    const list = fakeRes();
+    await controller.listFixed({ params: {} }, list);
+    assert.strictEqual(list.body[0].imageUrl, PERMANENT);
+});

@@ -1,5 +1,7 @@
+const { permanentPhotoUrl } = require('../services/photoUrl');
+
 // "Marked as fixed" flow: public lookup and marking, admin listing and reopening.
-function createFixedController({ db, now = () => new Date() }) {
+function createFixedController({ db, bucketName, now = () => new Date() }) {
     const bumpRef = (id) => db.collection('bumps').doc(id);
 
     const handle = (name, fn) => async (req, res) => {
@@ -21,7 +23,7 @@ function createFixedController({ db, now = () => new Date() }) {
             const { imageUrl, location, address, createdAt, fixed } = snap.data();
             res.json({
                 id: snap.id,
-                imageUrl,
+                imageUrl: permanentPhotoUrl(imageUrl, bucketName),
                 location,
                 ...(address ? { address } : {}),
                 createdAt,
@@ -42,7 +44,10 @@ function createFixedController({ db, now = () => new Date() }) {
 
         listFixed: handle('listFixed', async (req, res) => {
             const snapshot = await db.collection('bumps').where('fixed', '==', true).get();
-            const bumps = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+            const bumps = snapshot.docs.map((doc) => {
+                const data = doc.data();
+                return { id: doc.id, ...data, imageUrl: permanentPhotoUrl(data.imageUrl, bucketName) };
+            });
             // Sorted here so no composite Firestore index is needed.
             bumps.sort((a, b) => (b.fixedAt || '').localeCompare(a.fixedAt || ''));
             res.json(bumps);

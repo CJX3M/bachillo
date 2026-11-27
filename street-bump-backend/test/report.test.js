@@ -128,3 +128,19 @@ test('geocoder returns display_name, or null on an error response', async () => 
     const bad = createReverseGeocoder({ apiKey: 'k', fetchImpl: async () => ({ ok: false }) });
     assert.strictEqual(await bad(29, -110), null);
 });
+
+test('handler stops geocoding when the time budget runs out and still renders every bump', async () => {
+    const docs = {};
+    for (let i = 0; i < 10; i += 1) docs[`b${i}`] = bump({ address: undefined });
+    let time = 0;
+    let calls = 0;
+    const res = fakeRes();
+    await createReportHandler({
+        db: fakeDb(docs), now: () => NOW, baseUrl: BASE, bucketName: 'b', sleep: async () => {},
+        clock: () => time,
+        reverseGeocode: async () => { calls += 1; time += 5000; return null; },
+    })({}, res);
+    assert.strictEqual(calls, 4);
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(res.body.match(/<article>/g).length, 10);
+});
